@@ -1,0 +1,249 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import api from '../../utils/api';
+import toast from 'react-hot-toast';
+import {
+  PhotoIcon, CalendarIcon, PaperAirplaneIcon,
+  XMarkIcon, DocumentIcon,
+} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
+
+const PLATFORM_LIMITS = {
+  TWITTER: 280, FACEBOOK: 63206, INSTAGRAM: 2200,
+  LINKEDIN: 3000, TIKTOK: 2200,
+};
+
+const PLATFORM_ICONS = {
+  FACEBOOK: { label: 'Facebook', bg: '#1877F2', short: 'FB' },
+  INSTAGRAM: { label: 'Instagram', bg: '#E1306C', short: 'IG' },
+  TWITTER: { label: 'Twitter/X', bg: '#000', short: 'X' },
+  LINKEDIN: { label: 'LinkedIn', bg: '#0A66C2', short: 'LI' },
+  TIKTOK: { label: 'TikTok', bg: '#000', short: 'TK' },
+};
+
+export default function ComposePage() {
+  const { postId } = useParams();
+  const navigate = useNavigate();
+  const [content, setContent] = useState('');
+  const [accounts, setAccounts] = useState([]);
+  const [selectedAccounts, setSelectedAccounts] = useState([]);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get('/social').then((res) => setAccounts(res.data)).catch(() => {});
+    if (postId) {
+      api.get(`/posts/${postId}`).then((res) => {
+        const post = res.data;
+        setContent(post.content);
+        setSelectedAccounts(post.accounts.map((a) => a.socialAccountId));
+        if (post.scheduledAt) {
+          setScheduledAt(format(new Date(post.scheduledAt), "yyyy-MM-dd'T'HH:mm"));
+        }
+      }).catch(() => toast.error('Post not found'));
+    }
+  }, [postId]);
+
+  const toggleAccount = (id) => {
+    setSelectedAccounts((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = async (action) => {
+    if (!content.trim()) return toast.error('Write something first');
+    if (selectedAccounts.length === 0) return toast.error('Select at least one account');
+    if (action === 'schedule' && !scheduledAt) return toast.error('Pick a scheduled time');
+
+    const data = {
+      content,
+      accountIds: selectedAccounts,
+      ...(action === 'schedule' && { scheduledAt }),
+    };
+
+    try {
+      setSaving(true);
+      if (postId) {
+        await api.patch(`/posts/${postId}`, data);
+        toast.success('Post updated');
+      } else {
+        const res = await api.post('/posts', data);
+        if (action === 'publish') {
+          await api.post(`/posts/${res.data.id}/publish`);
+          toast.success('Post sent for publishing!');
+        } else if (action === 'schedule') {
+          toast.success('Post scheduled!');
+        } else {
+          toast.success('Draft saved');
+        }
+      }
+      navigate('/posts');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save post');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Active platform limits
+  const activePlatforms = accounts
+    .filter((a) => selectedAccounts.includes(a.id))
+    .map((a) => a.platform);
+
+  const strictestLimit = activePlatforms.length > 0
+    ? Math.min(...activePlatforms.map((p) => PLATFORM_LIMITS[p] || Infinity))
+    : null;
+
+  const charCount = content.length;
+  const isOverLimit = strictestLimit && charCount > strictestLimit;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">{postId ? 'Edit Post' : 'Create Post'}</h1>
+        <button onClick={() => navigate(-1)} className="btn-secondary">Cancel</button>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-5">
+        {/* Compose area */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="card p-5">
+            <label className="label">Content</label>
+            <textarea
+              className="input resize-none"
+              rows={8}
+              placeholder="What do you want to share today?..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-2">
+                <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Add media">
+                  <PhotoIcon className="w-5 h-5" />
+                </button>
+              </div>
+              <span className={`text-xs ${isOverLimit ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                {charCount}{strictestLimit ? `/${strictestLimit}` : ''} characters
+                {isOverLimit && ' — Too long!'}
+              </span>
+            </div>
+          </div>
+
+          {/* Preview */}
+          {content && (
+            <div className="card p-5">
+              <h3 className="font-semibold text-gray-700 text-sm mb-3">Preview</h3>
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-purple-500" />
+                  <div>
+                    <div className="h-3 bg-gray-300 rounded w-24" />
+                    <div className="h-2.5 bg-gray-200 rounded w-16 mt-1" />
+                  </div>
+                </div>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{content}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right sidebar */}
+        <div className="space-y-4">
+          {/* Account selection */}
+          <div className="card p-5">
+            <h3 className="font-semibold text-gray-800 mb-3 text-sm">Publish to</h3>
+            {accounts.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500 mb-2">No accounts connected</p>
+                <button
+                  onClick={() => navigate('/accounts')}
+                  className="text-xs text-primary-600 font-medium hover:underline"
+                >
+                  + Connect accounts
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {accounts.map((acc) => {
+                  const meta = PLATFORM_ICONS[acc.platform] || {};
+                  const selected = selectedAccounts.includes(acc.id);
+                  return (
+                    <button
+                      key={acc.id}
+                      onClick={() => toggleAccount(acc.id)}
+                      className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${
+                        selected ? 'border-primary-300 bg-primary-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        style={{ backgroundColor: meta.bg }}
+                      >
+                        {meta.short}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{acc.name}</p>
+                        <p className="text-xs text-gray-500">{meta.label}</p>
+                      </div>
+                      <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+                        selected ? 'bg-primary-500 border-primary-500' : 'border-gray-300'
+                      }`}>
+                        {selected && <XMarkIcon className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Schedule */}
+          <div className="card p-5">
+            <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-gray-500" />
+              Schedule (optional)
+            </h3>
+            <input
+              type="datetime-local"
+              className="input text-sm"
+              value={scheduledAt}
+              min={format(new Date(), "yyyy-MM-dd'T'HH:mm")}
+              onChange={(e) => setScheduledAt(e.target.value)}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-2">
+            <button
+              onClick={() => handleSave('publish')}
+              disabled={saving || isOverLimit}
+              className="btn-primary w-full"
+            >
+              <PaperAirplaneIcon className="w-4 h-4" />
+              {saving ? 'Publishing...' : 'Publish Now'}
+            </button>
+            {scheduledAt && (
+              <button
+                onClick={() => handleSave('schedule')}
+                disabled={saving || isOverLimit}
+                className="btn-secondary w-full"
+              >
+                <CalendarIcon className="w-4 h-4" />
+                Schedule Post
+              </button>
+            )}
+            <button
+              onClick={() => handleSave('draft')}
+              disabled={saving}
+              className="btn-secondary w-full text-gray-600"
+            >
+              <DocumentIcon className="w-4 h-4" />
+              Save as Draft
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

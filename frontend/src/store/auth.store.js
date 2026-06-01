@@ -38,6 +38,9 @@ export const useAuthStore = create(
     {
       name: 'orciid-auth',
       partialize: (s) => ({ user: s.user, token: s.token, refreshToken: s.refreshToken }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state._hasHydrated = true;
+      },
     }
   )
 );

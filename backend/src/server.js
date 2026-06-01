@@ -67,7 +67,7 @@ const server = app.listen(PORT, () => {
 
   console.log('Running prisma db push in background...');
   exec(
-    'node node_modules/.bin/prisma db push --accept-data-loss',
+    process.execPath + ' node_modules/.bin/prisma db push --accept-data-loss',
     { cwd: __dirname + '/..', timeout: 120000 },
     (err, stdout, stderr) => {
       if (err) {

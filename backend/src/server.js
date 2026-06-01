@@ -1,4 +1,15 @@
-require('dotenv').config();
+// Load env vars — Hostinger stores them in .builds/config/.env (not in nodejs/)
+const path = require('path');
+const fs = require('fs');
+
+const hostingerEnvPath = '/home/u957441087/domains/orciid.online/public_html/.builds/config/.env';
+const localEnvPath = path.resolve(__dirname, '../.env');
+
+if (fs.existsSync(hostingerEnvPath)) {
+  require('dotenv').config({ path: hostingerEnvPath });
+} else {
+  require('dotenv').config({ path: localEnvPath });
+}
 const { exec } = require('child_process');
 const app = require('./app');
 const { initScheduler } = require('./services/scheduler.service');

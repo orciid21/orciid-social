@@ -72,6 +72,8 @@ const server = app.listen(PORT, () => {
     (err, stdout, stderr) => {
       if (err) {
         write('Prisma db push failed: ' + err.message);
+        if (stderr) write('Prisma stderr: ' + stderr);
+        if (stdout) write('Prisma stdout: ' + stdout);
         console.error('Prisma db push failed:', err.message);
         if (stderr) console.error(stderr);
       } else {

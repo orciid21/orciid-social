@@ -1,48 +1,86 @@
-const Bull = require('bull');
+const cron = require('node-cron');
 const prisma = require('../config/prisma');
 const publisherService = require('./publisher.service');
 
-const postQueue = new Bull('post-publishing', {
-  redis: process.env.REDIS_URL || 'redis://localhost:6379',
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 5000 },
-    removeOnComplete: 100,
-    removeOnFail: 200,
-  },
-});
+// In-memory map of scheduled jobs: postId → cron task
+const scheduledJobs = new Map();
 
-// Process jobs
-postQueue.process(async (job) => {
-  const { postId } = job.data;
-  await publisherService.publishPost(postId);
-});
+// On server start, reload all pending scheduled posts from DB
+const initScheduler = async () => {
+  try {
+    const pendingPosts = await prisma.post.findMany({
+      where: {
+        status: 'SCHEDULED',
+        scheduledAt: { gte: new Date() },
+      },
+    });
 
-postQueue.on('failed', async (job, err) => {
-  console.error(`Post job ${job.id} failed:`, err.message);
-  await prisma.post.update({
-    where: { id: job.data.postId },
-    data: { status: 'FAILED', failReason: err.message },
-  });
-});
+    for (const post of pendingPosts) {
+      await schedulePost(post.id, post.scheduledAt);
+    }
+
+    console.log(`Scheduler initialized: ${pendingPosts.length} posts loaded`);
+  } catch (err) {
+    console.error('Scheduler init error:', err.message);
+  }
+};
+
+// Convert a Date to a cron expression (runs once at exact time)
+const dateToCron = (date) => {
+  const minutes = date.getMinutes();
+  const hours = date.getHours();
+  const dayOfMonth = date.getDate();
+  const month = date.getMonth() + 1;
+  return `${minutes} ${hours} ${dayOfMonth} ${month} *`;
+};
 
 const schedulePost = async (postId, scheduledAt) => {
-  const delay = Math.max(0, scheduledAt.getTime() - Date.now());
-  await postQueue.add({ postId }, { delay, jobId: `post-${postId}` });
+  // Cancel existing job if any
+  cancelPost(postId);
+
+  const now = new Date();
+  if (scheduledAt <= now) {
+    // Past due — publish immediately
+    await publisherService.publishPost(postId);
+    return;
+  }
+
+  const cronExpr = dateToCron(scheduledAt);
+
+  const task = cron.schedule(cronExpr, async () => {
+    try {
+      await publisherService.publishPost(postId);
+    } catch (err) {
+      console.error(`Failed to publish post ${postId}:`, err.message);
+      await prisma.post.update({
+        where: { id: postId },
+        data: { status: 'FAILED', failReason: err.message },
+      });
+    }
+    // Remove job after it fires
+    scheduledJobs.delete(postId);
+    task.stop();
+  });
+
+  scheduledJobs.set(postId, task);
 };
 
 const reschedulePost = async (postId, scheduledAt) => {
-  await cancelPost(postId);
+  cancelPost(postId);
   await schedulePost(postId, scheduledAt);
 };
 
-const cancelPost = async (postId) => {
-  const job = await postQueue.getJob(`post-${postId}`);
-  if (job) await job.remove();
+const cancelPost = (postId) => {
+  const task = scheduledJobs.get(postId);
+  if (task) {
+    task.stop();
+    scheduledJobs.delete(postId);
+  }
 };
 
 const publishPostNow = async (postId) => {
-  await postQueue.add({ postId }, { jobId: `post-${postId}-now-${Date.now()}` });
+  cancelPost(postId);
+  await publisherService.publishPost(postId);
 };
 
-module.exports = { schedulePost, reschedulePost, cancelPost, publishPostNow, postQueue };
+module.exports = { initScheduler, schedulePost, reschedulePost, cancelPost, publishPostNow };

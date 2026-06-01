@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -76,8 +76,8 @@ model SocialAccount {
   name         String
   username     String?
   avatar       String?
-  accessToken  String
-  refreshToken String?
+  accessToken  String         @db.Text
+  refreshToken String?        @db.Text
   tokenExpiry  DateTime?
   isActive     Boolean        @default(true)
   createdAt    DateTime       @default(now())
@@ -94,8 +94,8 @@ model Post {
   id          String      @id @default(uuid())
   userId      String
   workspaceId String?
-  content     String
-  mediaUrls   String[]
+  content     String      @db.Text
+  mediaUrls   Json        @default("[]")
   status      PostStatus  @default(DRAFT)
   scheduledAt DateTime?
   publishedAt DateTime?

@@ -14,6 +14,7 @@ const analyticsRoutes = require('./routes/analytics.routes');
 const subscriptionRoutes = require('./routes/subscription.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
 const oauthRoutes = require('./routes/oauth.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const { errorHandler } = require('./middleware/error.middleware');
 
@@ -76,6 +77,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/auth', oauthRoutes); // OAuth callbacks
+app.use('/api/admin', adminRoutes);
 
 // SPA fallback — serve React app for all non-API routes
 app.get('*', (req, res) => {

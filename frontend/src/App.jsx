@@ -20,10 +20,18 @@ import AnalyticsPage from './pages/app/AnalyticsPage';
 import PostsPage from './pages/app/PostsPage';
 import SettingsPage from './pages/app/SettingsPage';
 import BillingPage from './pages/app/BillingPage';
+import AdminPage from './pages/admin/AdminPage';
 
 const ProtectedRoute = ({ children }) => {
   const token = useAuthStore((s) => s.token);
   return token ? children : <Navigate to="/login" replace />;
+};
+
+const AdminRoute = ({ children }) => {
+  const { token, user } = useAuthStore();
+  if (!token) return <Navigate to="/login" replace />;
+  if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
+  return children;
 };
 
 const GuestRoute = ({ children }) => {
@@ -55,6 +63,9 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="settings/billing" element={<BillingPage />} />
       </Route>
+
+      {/* Admin */}
+      <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

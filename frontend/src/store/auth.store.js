@@ -8,6 +8,8 @@ export const useAuthStore = create(
       user: null,
       token: null,
       refreshToken: null,
+      _hasHydrated: false,
+      setHasHydrated: (val) => set({ _hasHydrated: val }),
 
       login: async (email, password) => {
         const { data } = await api.post('/auth/login', { email, password });
@@ -39,7 +41,7 @@ export const useAuthStore = create(
       name: 'orciid-auth',
       partialize: (s) => ({ user: s.user, token: s.token, refreshToken: s.refreshToken }),
       onRehydrateStorage: () => (state) => {
-        if (state) state._hasHydrated = true;
+        if (state) state.setHasHydrated(true);
       },
     }
   )

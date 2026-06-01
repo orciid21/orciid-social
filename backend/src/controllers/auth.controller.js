@@ -53,7 +53,12 @@ const register = async (req, res, next) => {
       },
     });
 
-    await emailService.sendVerificationEmail(email, name, verifyToken);
+    // Send verification email — non-fatal if SMTP not configured
+    try {
+      await emailService.sendVerificationEmail(email, name, verifyToken);
+    } catch (emailErr) {
+      console.warn('Verification email failed (SMTP not configured?):', emailErr.message);
+    }
 
     const { accessToken, refreshToken } = generateTokens(user.id);
 
@@ -144,7 +149,11 @@ const forgotPassword = async (req, res, next) => {
       },
     });
 
-    await emailService.sendPasswordResetEmail(email, user.name, resetToken);
+    try {
+      await emailService.sendPasswordResetEmail(email, user.name, resetToken);
+    } catch (emailErr) {
+      console.warn('Password reset email failed (SMTP not configured?):', emailErr.message);
+    }
     res.json({ message: 'If the email exists, a reset link has been sent.' });
   } catch (err) {
     next(err);

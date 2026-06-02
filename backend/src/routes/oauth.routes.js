@@ -42,6 +42,15 @@ const saveSocialAccount = async (userId, platform, profileData) => {
 
 const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
 
+// Base URL of THIS API server. The API + frontend share one origin (orciid.online);
+// there is no api.orciid.online subdomain. Used to build OAuth callback URLs when
+// a platform-specific *_CALLBACK_URL env var is not set.
+const getOAuthBaseUrl = () => {
+  if (process.env.API_URL) return process.env.API_URL.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'production') return 'https://orciid.online';
+  return `http://localhost:${process.env.PORT || 5000}`;
+};
+
 // --- Facebook / Instagram ---
 // NOTE: Requires passport-facebook. Configure in production with real credentials.
 router.get('/facebook', (req, res) => {
@@ -141,11 +150,15 @@ router.get('/twitter/callback', async (req, res) => {
   }
 });
 
-// --- LinkedIn ---
+// --- LinkedIn (OpenID Connect — current API) ---
+// NOTE: The old r_liteprofile / r_emailaddress scopes and /v2/me projection are
+// deprecated. LinkedIn now uses OIDC: scopes "openid profile email" for identity
+// + "w_member_social" for posting, and the /v2/userinfo endpoint.
 router.get('/linkedin', (req, res) => {
   const { token } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
-  const linkedinUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${process.env.LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.LINKEDIN_CALLBACK_URL)}&state=${state}&scope=r_liteprofile%20r_emailaddress%20w_member_social`;
+  const scope = encodeURIComponent('openid profile email w_member_social');
+  const linkedinUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${process.env.LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.LINKEDIN_CALLBACK_URL)}&state=${state}&scope=${scope}`;
   res.redirect(linkedinUrl);
 });
 
@@ -169,22 +182,87 @@ router.get('/linkedin/callback', async (req, res) => {
     );
 
     const { access_token } = tokenRes.data;
-    const profileRes = await axios.get('https://api.linkedin.com/v2/me', {
-      params: { projection: '(id,localizedFirstName,localizedLastName,profilePicture(displayImage~:playableStreams))' },
+    // OIDC userinfo: returns { sub, name, given_name, family_name, email, picture }
+    const profileRes = await axios.get('https://api.linkedin.com/v2/userinfo', {
       headers: { Authorization: `Bearer ${access_token}` },
     });
 
     const p = profileRes.data;
     await saveSocialAccount(user.id, 'LINKEDIN', {
-      platformId: p.id,
-      name: `${p.localizedFirstName} ${p.localizedLastName}`,
+      platformId: p.sub,
+      name: p.name || `${p.given_name || ''} ${p.family_name || ''}`.trim(),
+      username: p.email,
+      avatar: p.picture,
       accessToken: access_token,
     });
 
     res.redirect(`${FRONTEND}/accounts?connected=linkedin`);
   } catch (err) {
-    console.error('LinkedIn OAuth error:', err.message);
+    console.error('LinkedIn OAuth error:', err.response?.data || err.message);
     res.redirect(`${FRONTEND}/accounts?error=linkedin_failed`);
+  }
+});
+
+// --- Instagram (via Facebook Login — Instagram Graph API) ---
+// Requires an Instagram BUSINESS/CREATOR account linked to a Facebook Page.
+// Flow: FB OAuth -> list Pages -> find the Page's linked instagram_business_account.
+// The Page access token (not the user token) is what publishes to Instagram.
+router.get('/instagram', (req, res) => {
+  const { token } = req.query;
+  const state = Buffer.from(JSON.stringify({ token })).toString('base64');
+  const appId = process.env.INSTAGRAM_APP_ID || process.env.FACEBOOK_APP_ID;
+  const redirect = process.env.INSTAGRAM_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/instagram/callback`;
+  const scope = 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management';
+  const igUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=${scope}`;
+  res.redirect(igUrl);
+});
+
+router.get('/instagram/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    const { token } = JSON.parse(Buffer.from(state, 'base64').toString());
+    const user = await getUserFromToken(token);
+    if (!user) return res.redirect(`${FRONTEND}/accounts?error=auth_failed`);
+
+    const axios = require('axios').default;
+    const appId = process.env.INSTAGRAM_APP_ID || process.env.FACEBOOK_APP_ID;
+    const appSecret = process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET;
+    const redirect = process.env.INSTAGRAM_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/instagram/callback`;
+
+    // 1. Exchange code for a user access token
+    const tokenRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+      params: { client_id: appId, client_secret: appSecret, redirect_uri: redirect, code },
+    });
+    const userToken = tokenRes.data.access_token;
+
+    // 2. Find a Page with a linked Instagram business account
+    const pagesRes = await axios.get('https://graph.facebook.com/v18.0/me/accounts', {
+      params: { access_token: userToken, fields: 'id,name,access_token,instagram_business_account' },
+    });
+    const pageWithIg = (pagesRes.data.data || []).find((pg) => pg.instagram_business_account);
+    if (!pageWithIg) {
+      return res.redirect(`${FRONTEND}/accounts?error=no_instagram_business_account`);
+    }
+
+    // 3. Fetch the IG business account details (use the Page token going forward)
+    const igId = pageWithIg.instagram_business_account.id;
+    const igRes = await axios.get(`https://graph.facebook.com/v18.0/${igId}`, {
+      params: { access_token: pageWithIg.access_token, fields: 'id,username,name,profile_picture_url' },
+    });
+    const ig = igRes.data;
+
+    await saveSocialAccount(user.id, 'INSTAGRAM', {
+      platformId: ig.id,
+      name: ig.name || ig.username,
+      username: ig.username,
+      avatar: ig.profile_picture_url,
+      accessToken: pageWithIg.access_token, // Page token publishes to IG
+    });
+
+    res.redirect(`${FRONTEND}/accounts?connected=instagram`);
+  } catch (err) {
+    console.error('Instagram OAuth error:', err.response?.data || err.message);
+    res.redirect(`${FRONTEND}/accounts?error=instagram_failed`);
   }
 });
 

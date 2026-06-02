@@ -1,11 +1,28 @@
 const nodemailer = require('nodemailer');
 
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const isConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
+  port: SMTP_PORT,
+  // Port 465 = implicit TLS (secure). 587/25 = STARTTLS (secure:false, upgraded after connect).
+  secure: SMTP_PORT === 465,
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
 });
+
+// Verify the SMTP connection/credentials. Call from a test endpoint or on boot.
+const verifyConnection = async () => {
+  if (!isConfigured) {
+    return { ok: false, error: 'SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing)' };
+  }
+  try {
+    await transporter.verify();
+    return { ok: true, host: process.env.SMTP_HOST, port: SMTP_PORT };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+};
 
 const emailTemplate = (content) => `
 <!DOCTYPE html>
@@ -61,4 +78,4 @@ const sendPasswordResetEmail = async (email, name, token) => {
   });
 };
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail };
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, verifyConnection, isConfigured };

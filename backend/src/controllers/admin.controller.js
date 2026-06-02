@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
+const emailService = require('../services/email.service');
 
 // GET /api/admin/stats
 const getStats = async (req, res, next) => {
@@ -137,4 +138,28 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
-module.exports = { getStats, getUsers, updateUser, deleteUser };
+// GET /api/admin/email-status — check SMTP config + verify connection
+const getEmailStatus = async (req, res, next) => {
+  try {
+    const status = await emailService.verifyConnection();
+    res.json(status);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/admin/test-email — send a test email to the admin's own address
+const sendTestEmail = async (req, res, next) => {
+  try {
+    if (!emailService.isConfigured) {
+      throw new AppError('SMTP is not configured. Set SMTP_HOST/SMTP_USER/SMTP_PASS first.', 400);
+    }
+    // Reuse the verification template; sends to the requesting admin only.
+    await emailService.sendVerificationEmail(req.user.email, req.user.name, 'test-' + Date.now());
+    res.json({ message: `Test email sent to ${req.user.email}` });
+  } catch (err) {
+    next(new AppError('Failed to send test email: ' + err.message, 500));
+  }
+};
+
+module.exports = { getStats, getUsers, updateUser, deleteUser, getEmailStatus, sendTestEmail };

@@ -31,18 +31,26 @@ const disconnectAccount = async (req, res, next) => {
   }
 };
 
+// The API and frontend are both served from the same origin (orciid.online).
+// There is NO separate api.orciid.online subdomain — it does not resolve.
+// Override with API_URL env if the deployment ever moves to a dedicated host.
+const getApiBaseUrl = () => {
+  if (process.env.API_URL) return process.env.API_URL.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'production') return 'https://orciid.online';
+  return `http://localhost:${process.env.PORT || 5000}`;
+};
+
 const getConnectUrl = (req, res) => {
   const { platform } = req.params;
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://api.orciid.online'
-    : `http://localhost:${process.env.PORT || 5000}`;
+  const baseUrl = getApiBaseUrl();
+  const token = req.headers.authorization?.split(' ')[1];
 
   const urls = {
-    FACEBOOK: `${baseUrl}/auth/facebook?token=${req.headers.authorization?.split(' ')[1]}`,
-    TWITTER: `${baseUrl}/auth/twitter?token=${req.headers.authorization?.split(' ')[1]}`,
-    LINKEDIN: `${baseUrl}/auth/linkedin?token=${req.headers.authorization?.split(' ')[1]}`,
-    TIKTOK: `${baseUrl}/auth/tiktok?token=${req.headers.authorization?.split(' ')[1]}`,
-    INSTAGRAM: `${baseUrl}/auth/instagram?token=${req.headers.authorization?.split(' ')[1]}`,
+    FACEBOOK: `${baseUrl}/auth/facebook?token=${token}`,
+    TWITTER: `${baseUrl}/auth/twitter?token=${token}`,
+    LINKEDIN: `${baseUrl}/auth/linkedin?token=${token}`,
+    TIKTOK: `${baseUrl}/auth/tiktok?token=${token}`,
+    INSTAGRAM: `${baseUrl}/auth/instagram?token=${token}`,
   };
 
   const url = urls[platform.toUpperCase()];

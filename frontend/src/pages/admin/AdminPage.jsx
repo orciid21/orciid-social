@@ -65,6 +65,9 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [blockingId, setBlockingId] = useState(null);
+  const [emailStatus, setEmailStatus] = useState(null);
+  const [emailLoading, setEmailLoading] = useState(true);
+  const [testingEmail, setTestingEmail] = useState(false);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -90,9 +93,34 @@ export default function AdminPage() {
     }
   }, [search]);
 
+  const fetchEmailStatus = useCallback(async () => {
+    setEmailLoading(true);
+    try {
+      const { data } = await api.get('/admin/email-status');
+      setEmailStatus(data);
+    } catch (e) {
+      setEmailStatus({ ok: false, error: e.response?.data?.error || 'Failed to reach server' });
+    } finally {
+      setEmailLoading(false);
+    }
+  }, []);
+
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    try {
+      const { data } = await api.post('/admin/test-email');
+      alert(data.message || 'Test email sent — check your inbox.');
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to send test email');
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchUsers(1, '');
+    fetchEmailStatus();
   }, []);
 
   const handleSearch = (e) => {
@@ -224,6 +252,43 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* System Health — Email / SMTP */}
+        <div>
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">System Health</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">✉️</span>
+                <div>
+                  <p className="font-semibold text-gray-900">Email / SMTP</p>
+                  {emailLoading ? (
+                    <p className="text-sm text-gray-400">Checking connection…</p>
+                  ) : emailStatus?.ok ? (
+                    <p className="text-sm text-green-600 font-medium">
+                      ● Connected — {emailStatus.host}:{emailStatus.port}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-red-500 font-medium">
+                      ● Not working — {emailStatus?.error || 'unknown error'}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    Sends verification &amp; password-reset emails. Configure SMTP_* env vars on the server.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleTestEmail}
+                disabled={testingEmail || !emailStatus?.ok}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                title={emailStatus?.ok ? `Send a test email to ${user?.email}` : 'SMTP must be connected first'}
+              >
+                {testingEmail ? 'Sending…' : 'Send test email'}
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Recent Signups */}
         {stats?.recentUsers?.length > 0 && (

@@ -51,13 +51,19 @@ const getOAuthBaseUrl = () => {
   return `http://localhost:${process.env.PORT || 5000}`;
 };
 
+// Callback URL for a platform. Prefer an explicit *_CALLBACK_URL env var (must match
+// the developer-portal registration exactly); otherwise auto-derive from the origin.
+const callbackUrl = (platform, envVar) =>
+  process.env[envVar] || `${getOAuthBaseUrl()}/auth/${platform}/callback`;
+
 // --- Facebook / Instagram ---
 // NOTE: Requires passport-facebook. Configure in production with real credentials.
 router.get('/facebook', (req, res) => {
   // Store token in session or state param for callback
   const { token } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
-  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.FACEBOOK_CALLBACK_URL)}&state=${state}&scope=pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish`;
+  const redirect = callbackUrl('facebook', 'FACEBOOK_CALLBACK_URL');
+  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish`;
   res.redirect(fbUrl);
 });
 
@@ -74,7 +80,7 @@ router.get('/facebook/callback', async (req, res) => {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
-        redirect_uri: process.env.FACEBOOK_CALLBACK_URL,
+        redirect_uri: callbackUrl('facebook', 'FACEBOOK_CALLBACK_URL'),
         code,
       },
     });
@@ -103,7 +109,8 @@ router.get('/twitter', (req, res) => {
   const { token } = req.query;
   // Twitter OAuth 2.0 PKCE
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
-  const twitterUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_API_KEY}&redirect_uri=${encodeURIComponent(process.env.TWITTER_CALLBACK_URL)}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`;
+  const redirect = callbackUrl('twitter', 'TWITTER_CALLBACK_URL');
+  const twitterUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_API_KEY}&redirect_uri=${encodeURIComponent(redirect)}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`;
   res.redirect(twitterUrl);
 });
 
@@ -121,7 +128,7 @@ router.get('/twitter/callback', async (req, res) => {
       new URLSearchParams({
         code,
         grant_type: 'authorization_code',
-        redirect_uri: process.env.TWITTER_CALLBACK_URL,
+        redirect_uri: callbackUrl('twitter', 'TWITTER_CALLBACK_URL'),
         code_verifier: 'challenge',
       }),
       { headers: { Authorization: `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
@@ -158,7 +165,8 @@ router.get('/linkedin', (req, res) => {
   const { token } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const scope = encodeURIComponent('openid profile email w_member_social');
-  const linkedinUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${process.env.LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.LINKEDIN_CALLBACK_URL)}&state=${state}&scope=${scope}`;
+  const redirect = callbackUrl('linkedin', 'LINKEDIN_CALLBACK_URL');
+  const linkedinUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${process.env.LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=${scope}`;
   res.redirect(linkedinUrl);
 });
 
@@ -174,7 +182,7 @@ router.get('/linkedin/callback', async (req, res) => {
       new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: process.env.LINKEDIN_CALLBACK_URL,
+        redirect_uri: callbackUrl('linkedin', 'LINKEDIN_CALLBACK_URL'),
         client_id: process.env.LINKEDIN_CLIENT_ID,
         client_secret: process.env.LINKEDIN_CLIENT_SECRET,
       }),

@@ -23,22 +23,19 @@ import BillingPage from './pages/app/BillingPage';
 import AdminPage from './pages/admin/AdminPage';
 
 const ProtectedRoute = ({ children }) => {
-  const { token, _hasHydrated } = useAuthStore();
-  if (!_hasHydrated) return null; // wait for store to hydrate
+  const token = useAuthStore((s) => s.token);
   return token ? children : <Navigate to="/login" replace />;
 };
 
 const AdminRoute = ({ children }) => {
-  const { token, user, _hasHydrated } = useAuthStore();
-  if (!_hasHydrated) return null; // wait for store to hydrate
+  const { token, user } = useAuthStore();
   if (!token) return <Navigate to="/login" replace />;
   if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
   return children;
 };
 
 const GuestRoute = ({ children }) => {
-  const { token, _hasHydrated } = useAuthStore();
-  if (!_hasHydrated) return null; // wait for store to hydrate
+  const token = useAuthStore((s) => s.token);
   return token ? <Navigate to="/dashboard" replace /> : children;
 };
 

@@ -4,9 +4,8 @@ import { useAuthStore } from '../../store/auth.store';
 import {
   HomeIcon, PencilSquareIcon, CalendarIcon, ChartBarIcon,
   LinkIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon,
-  Bars3Icon, XMarkIcon, BellIcon, PlusIcon,
+  Bars3Icon, XMarkIcon, BellIcon, PlusIcon, ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
-import { HomeIcon as HomeSolid } from '@heroicons/react/24/solid';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
@@ -85,6 +84,23 @@ export default function DashboardLayout() {
               {label}
             </NavLink>
           ))}
+
+          {/* Admin link — only for ADMIN role */}
+          {user?.role === 'ADMIN' && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mt-2 ${
+                  isActive
+                    ? 'bg-red-50 text-red-700'
+                    : 'text-red-500 hover:bg-red-50 hover:text-red-700'
+                }`
+              }
+            >
+              <ShieldCheckIcon className="w-5 h-5 flex-shrink-0" />
+              Admin Panel
+            </NavLink>
+          )}
         </nav>
 
         {/* User */}

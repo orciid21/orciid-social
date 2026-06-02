@@ -30,7 +30,6 @@ if (fs.existsSync(hostingerEnvPath)) {
 }
 
 write('DATABASE_URL set: ' + !!process.env.DATABASE_URL);
-write('DATABASE_URL value: ' + (process.env.DATABASE_URL || 'NOT SET'));
 write('NODE_ENV: ' + process.env.NODE_ENV);
 write('PORT: ' + process.env.PORT);
 

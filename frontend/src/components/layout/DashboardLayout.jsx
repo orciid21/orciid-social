@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
+import api from '../../utils/api';
+import ComposeModal from '../compose/ComposeModal';
 import {
   HomeIcon, PencilSquareIcon, CalendarIcon, ChartBarIcon,
   LinkIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon,
   Bars3Icon, XMarkIcon, BellIcon, PlusIcon, ShieldCheckIcon,
+  ChevronDownIcon, DocumentTextIcon, Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 
 const navItems = [
@@ -16,14 +19,36 @@ const navItems = [
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ];
 
+const PLATFORM_META = {
+  FACEBOOK: { bg: '#1877F2', short: 'FB' },
+  INSTAGRAM: { bg: '#E1306C', short: 'IG' },
+  TWITTER: { bg: '#000', short: 'X' },
+  LINKEDIN: { bg: '#0A66C2', short: 'LI' },
+  TIKTOK: { bg: '#000', short: 'TK' },
+};
+
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [channelsOpen, setChannelsOpen] = useState(true);
+  const [composeOpen, setComposeOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get('/social').then((res) => setAccounts(res.data)).catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const openCompose = () => {
+    setNewMenuOpen(false);
+    setSidebarOpen(false);
+    setComposeOpen(true);
   };
 
   return (
@@ -55,15 +80,45 @@ export default function DashboardLayout() {
           </button>
         </div>
 
-        {/* New Post button */}
-        <div className="px-4 py-4">
+        {/* New button + dropdown */}
+        <div className="px-4 py-4 relative">
           <button
-            onClick={() => navigate('/compose')}
+            onClick={() => setNewMenuOpen((v) => !v)}
             className="btn-primary w-full"
           >
             <PlusIcon className="w-4 h-4" />
-            New Post
+            New
+            <ChevronDownIcon className="w-4 h-4 ml-auto" />
           </button>
+
+          {newMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setNewMenuOpen(false)} />
+              <div className="absolute z-50 left-4 right-4 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5">
+                <button
+                  onClick={openCompose}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50"
+                >
+                  <DocumentTextIcon className="w-5 h-5 text-primary-600 flex-shrink-0" />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-800">Post</span>
+                    <span className="block text-xs text-gray-400">Publish content to a channel</span>
+                  </span>
+                </button>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  onClick={() => { setNewMenuOpen(false); navigate('/accounts'); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50"
+                >
+                  <Squares2X2Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-800">Connect a New Channel</span>
+                    <span className="block text-xs text-gray-400">Add a social account</span>
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Nav */}
@@ -101,6 +156,59 @@ export default function DashboardLayout() {
               Admin Panel
             </NavLink>
           )}
+
+          {/* Channels */}
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <button
+              onClick={() => setChannelsOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-gray-600"
+            >
+              <span>Channels</span>
+              <ChevronDownIcon className={`w-4 h-4 transition-transform ${channelsOpen ? '' : '-rotate-90'}`} />
+            </button>
+
+            {channelsOpen && (
+              <div className="mt-1 space-y-0.5">
+                {accounts.map((acc) => {
+                  const meta = PLATFORM_META[acc.platform] || {};
+                  return (
+                    <button
+                      key={acc.id}
+                      onClick={() => navigate('/accounts')}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
+                    >
+                      <div className="relative w-7 h-7 flex-shrink-0">
+                        {acc.avatar ? (
+                          <img src={acc.avatar} alt="" className="w-7 h-7 rounded-md object-cover" />
+                        ) : (
+                          <div
+                            className="w-7 h-7 rounded-md flex items-center justify-center text-white text-[10px] font-bold"
+                            style={{ backgroundColor: meta.bg || '#888' }}
+                          >
+                            {(acc.name || '?').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div
+                          className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[7px] font-bold border border-white"
+                          style={{ backgroundColor: meta.bg || '#888' }}
+                        >
+                          {meta.short}
+                        </div>
+                      </div>
+                      <span className="flex-1 min-w-0 text-sm text-gray-700 truncate">{acc.name}</span>
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => navigate('/accounts')}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg"
+                >
+                  <PlusIcon className="w-4 h-4" /> Connect channels
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* User */}
@@ -139,7 +247,7 @@ export default function DashboardLayout() {
               <BellIcon className="w-5 h-5" />
             </button>
             <button
-              onClick={() => navigate('/compose')}
+              onClick={() => setComposeOpen(true)}
               className="btn-primary hidden sm:inline-flex"
             >
               <PlusIcon className="w-4 h-4" />
@@ -155,6 +263,8 @@ export default function DashboardLayout() {
           </div>
         </main>
       </div>
+
+      <ComposeModal open={composeOpen} onClose={() => setComposeOpen(false)} accounts={accounts} />
     </div>
   );
 }

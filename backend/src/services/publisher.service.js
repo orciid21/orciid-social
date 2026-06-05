@@ -3,6 +3,27 @@ const prisma = require('../config/prisma');
 
 const publishers = {
   FACEBOOK: async (account, post) => {
+    const media = Array.isArray(post.mediaUrls) ? post.mediaUrls.filter(Boolean) : [];
+
+    if (media.length > 0) {
+      const url = media[0];
+      const isVideo = /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(url);
+
+      if (isVideo) {
+        const res = await axios.post(
+          `https://graph.facebook.com/v18.0/me/videos`,
+          { file_url: url, description: post.content, access_token: account.accessToken }
+        );
+        return res.data.id;
+      }
+
+      const res = await axios.post(
+        `https://graph.facebook.com/v18.0/me/photos`,
+        { url, caption: post.content, access_token: account.accessToken }
+      );
+      return res.data.post_id || res.data.id;
+    }
+
     const res = await axios.post(
       `https://graph.facebook.com/v18.0/me/feed`,
       { message: post.content, access_token: account.accessToken }

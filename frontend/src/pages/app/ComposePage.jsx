@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -21,6 +21,9 @@ const PLATFORM_ICONS = {
   TIKTOK: { label: 'TikTok', bg: '#000', short: 'TK' },
 };
 
+const MAX_FILE_MB = 10;
+const isVideoUrl = (url) => /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(url || '');
+
 export default function ComposePage() {
   const { postId } = useParams();
   const navigate = useNavigate();
@@ -30,6 +33,9 @@ export default function ComposePage() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [media, setMedia] = useState([]); // [{ url, type: 'image' | 'video' }]
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     api.get('/social').then((res) => setAccounts(res.data)).catch(() => {});
@@ -38,6 +44,9 @@ export default function ComposePage() {
         const post = res.data;
         setContent(post.content);
         setSelectedAccounts(post.accounts.map((a) => a.socialAccountId));
+        if (Array.isArray(post.mediaUrls)) {
+          setMedia(post.mediaUrls.filter(Boolean).map((url) => ({ url, type: isVideoUrl(url) ? 'video' : 'image' })));
+        }
         if (post.scheduledAt) {
           setScheduledAt(format(new Date(post.scheduledAt), "yyyy-MM-dd'T'HH:mm"));
         }
@@ -51,6 +60,36 @@ export default function ComposePage() {
     );
   };
 
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      return toast.error(`File is too large. Maximum size is ${MAX_FILE_MB}MB.`);
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setUploading(true);
+      const res = await api.post('/uploads', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setMedia((prev) => [...prev, { url: res.data.url, type: res.data.type }]);
+      toast.success('Media added');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload media');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeMedia = (url) => {
+    setMedia((prev) => prev.filter((m) => m.url !== url));
+  };
+
   const handleSave = async (action) => {
     if (!content.trim()) return toast.error('Write something first');
     if (selectedAccounts.length === 0) return toast.error('Select at least one account');
@@ -59,6 +98,7 @@ export default function ComposePage() {
     const data = {
       content,
       accountIds: selectedAccounts,
+      mediaUrls: media.map((m) => m.url),
       ...(action === 'schedule' && { scheduledAt }),
     };
 
@@ -119,15 +159,57 @@ export default function ComposePage() {
             />
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-2">
-                <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Add media">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Add image or video"
+                >
                   <PhotoIcon className="w-5 h-5" />
                 </button>
+                {uploading && <span className="text-xs text-gray-400">Uploading…</span>}
               </div>
               <span className={`text-xs ${isOverLimit ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
                 {charCount}{strictestLimit ? `/${strictestLimit}` : ''} characters
                 {isOverLimit && ' — Too long!'}
               </span>
             </div>
+
+            {/* Selected media */}
+            {media.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
+                {media.map((m) => (
+                  <div key={m.url} className="relative group rounded-lg overflow-hidden border border-gray-200 bg-gray-50 aspect-square">
+                    {m.type === 'video' ? (
+                      <video src={m.url} className="w-full h-full object-cover" muted />
+                    ) : (
+                      <img src={m.url} alt="media" className="w-full h-full object-cover" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeMedia(m.url)}
+                      className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white"
+                      title="Remove"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" />
+                    </button>
+                    {m.type === 'video' && (
+                      <span className="absolute bottom-1 left-1 text-[10px] font-medium px-1.5 py-0.5 bg-black/60 rounded text-white">
+                        Video
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Preview */}
@@ -217,7 +299,7 @@ export default function ComposePage() {
           <div className="space-y-2">
             <button
               onClick={() => handleSave('publish')}
-              disabled={saving || isOverLimit}
+              disabled={saving || uploading || isOverLimit}
               className="btn-primary w-full"
             >
               <PaperAirplaneIcon className="w-4 h-4" />
@@ -226,7 +308,7 @@ export default function ComposePage() {
             {scheduledAt && (
               <button
                 onClick={() => handleSave('schedule')}
-                disabled={saving || isOverLimit}
+                disabled={saving || uploading || isOverLimit}
                 className="btn-secondary w-full"
               >
                 <CalendarIcon className="w-4 h-4" />

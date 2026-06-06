@@ -28,7 +28,50 @@ const EMOJIS = [
 ];
 
 const MAX_FILE_MB = 10;
+const MAX_IMAGE_DIM = 2048; // downscale large images so the upload payload stays small
 const isVideoUrl = (url) => /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(url || '');
+
+// Read a File/Blob as a base64 data URL (data:<mime>;base64,<data>).
+const readAsDataURL = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+
+// Re-encode an image through a canvas, shrinking it to MAX_IMAGE_DIM on the
+// longest side. Returns a data URL, or null if the image can't be processed
+// (the caller then falls back to the original file bytes).
+const downscaleImage = (file) =>
+  new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > MAX_IMAGE_DIM || height > MAX_IMAGE_DIM) {
+        const scale = Math.min(MAX_IMAGE_DIM / width, MAX_IMAGE_DIM / height);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+      }
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const isPng = /png$/i.test(file.type);
+        resolve(canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.85));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
 
 function Avatar({ account, size = 'w-10 h-10' }) {
   const meta = PLATFORM_META[account.platform] || {};
@@ -149,10 +192,20 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
         toast.error(`${file.name || 'File'} is too large. Maximum size is ${MAX_FILE_MB}MB.`);
         continue;
       }
-      const formData = new FormData();
-      formData.append('file', file);
       try {
-        const res = await api.post('/uploads', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        // Images are re-encoded through a canvas to shrink them; videos/gifs are
+        // sent as-is. Either way the file travels as a base64 string inside a JSON
+        // body — Hostinger's CDN blocks binary multipart uploads (405), but lets
+        // JSON through, so this is what actually makes uploads work in production.
+        const isImage = file.type.startsWith('image/') && !/gif$/i.test(file.type);
+        let dataUrl = isImage ? await downscaleImage(file) : null;
+        if (!dataUrl) dataUrl = await readAsDataURL(file);
+
+        const res = await api.post('/uploads', {
+          dataBase64: dataUrl,
+          contentType: file.type || undefined,
+          name: file.name,
+        });
         setMedia((prev) => [...prev, { url: res.data.url, type: res.data.type }]);
         added += 1;
       } catch (err) {

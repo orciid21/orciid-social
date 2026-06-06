@@ -49,8 +49,10 @@ app.use('/api', limiter);
 
 // Body parsing - webhook needs raw body
 app.use('/api/subscriptions/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Limits are generous because images can be uploaded as base64 inside a JSON
+// body (see upload.routes.js) — base64 inflates payloads by ~33%.
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(compression());
 
 // Logging

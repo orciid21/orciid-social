@@ -55,52 +55,107 @@ try {
 }
 
 const { exec } = require('child_process');
+const prismaClient = require('./config/prisma');
 const PORT = process.env.PORT || 5000;
 
-write('Starting server on port: ' + PORT);
+let server;
 
-const server = app.listen(PORT, () => {
-  write('Server listening on port ' + PORT);
-  console.log(`🚀 Orciid Social API running on port ${PORT}`);
-  console.log(`   Environment: ${process.env.NODE_ENV}`);
+// --- Idempotent schema migration, run BEFORE the server accepts traffic ---
+// Why this exists: the `prisma` CLI is a devDependency and is NOT installed in
+// production, so `prisma db push` silently fails there. Any column newly added to
+// schema.prisma then never reaches the database — yet the regenerated Prisma client
+// still SELECTs it on every query, which makes EVERY request on that table 500
+// (this took down login once). To avoid that, we add missing columns here using
+// @prisma/client (a real, always-installed dependency) instead of the CLI.
+//
+// Each entry first checks INFORMATION_SCHEMA and only ALTERs when the column is
+// absent, so it is safe to run on every boot. Table/column names are hardcoded
+// constants (never user input), so inlining them into the DDL is safe.
+const PENDING_COLUMNS = [
+  {
+    table: 'User',
+    column: 'fbConnectToken',
+    ddl: 'ALTER TABLE `User` ADD COLUMN `fbConnectToken` TEXT NULL',
+  },
+];
 
-  console.log('Running prisma db push in background...');
-  exec(
-    process.execPath + ' node_modules/.bin/prisma db push --accept-data-loss',
-    { cwd: __dirname + '/..', timeout: 120000 },
-    (err, stdout, stderr) => {
-      if (err) {
-        write('Prisma db push failed: ' + err.message);
-        if (stderr) write('Prisma stderr: ' + stderr);
-        if (stdout) write('Prisma stdout: ' + stdout);
-        console.error('Prisma db push failed:', err.message);
-        if (stderr) console.error(stderr);
-      } else {
-        write('Prisma db push completed');
-        console.log('Prisma db push completed successfully.');
-        if (stdout) console.log(stdout);
+const ensureColumns = async () => {
+  for (const { table, column, ddl } of PENDING_COLUMNS) {
+    try {
+      const rows = await prismaClient.$queryRawUnsafe(
+        'SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+        table,
+        column
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        write(`Column ${table}.${column} already exists — skipping`);
+        continue;
       }
-      initScheduler();
+      await prismaClient.$executeRawUnsafe(ddl);
+      write(`Column ${table}.${column} added successfully`);
+    } catch (err) {
+      // Never let a migration hiccup stop the server from booting.
+      write(`ensureColumns error for ${table}.${column}: ` + (err.message || err));
     }
-  );
-});
+  }
+};
 
-server.on('error', (err) => {
-  write('Server error: ' + err.message);
-});
+const startServer = () => {
+  write('Starting server on port: ' + PORT);
+  server = app.listen(PORT, () => {
+    write('Server listening on port ' + PORT);
+    console.log(`🚀 Orciid Social API running on port ${PORT}`);
+    console.log(`   Environment: ${process.env.NODE_ENV}`);
+
+    // Best-effort: also try the prisma CLI db push, in case it ever IS available.
+    // Harmless when it isn't — ensureColumns() already added what we need.
+    console.log('Running prisma db push in background...');
+    exec(
+      process.execPath + ' node_modules/.bin/prisma db push --accept-data-loss',
+      { cwd: __dirname + '/..', timeout: 120000 },
+      (err, stdout, stderr) => {
+        if (err) {
+          write('Prisma db push failed: ' + err.message);
+          if (stderr) write('Prisma stderr: ' + stderr);
+          if (stdout) write('Prisma stdout: ' + stdout);
+        } else {
+          write('Prisma db push completed');
+          if (stdout) console.log(stdout);
+        }
+        initScheduler();
+      }
+    );
+  });
+
+  server.on('error', (err) => {
+    write('Server error: ' + err.message);
+  });
+};
+
+// Run the migration first, then start listening — whether it succeeds or not.
+write('Running ensureColumns migration before listen...');
+ensureColumns().finally(startServer);
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Server closed.');
+  if (server) {
+    server.close(() => {
+      console.log('Server closed.');
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 });
 
 process.on('unhandledRejection', (err) => {
   write('Unhandled rejection: ' + err.message);
   console.error('Unhandled Promise Rejection:', err);
-  server.close(() => process.exit(1));
+  if (server) {
+    server.close(() => process.exit(1));
+  } else {
+    process.exit(1);
+  }
 });
 
 process.on('uncaughtException', (err) => {

@@ -94,6 +94,7 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -105,6 +106,7 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
       setMedia([]);
       setScheduledAt('');
       setEmojiOpen(false);
+      setDragActive(false);
       setSelectedAccounts(accounts.map((a) => a.id));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,25 +139,54 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
     });
   };
 
-  const handleFileSelect = async (e) => {
-    const file = e.target.files?.[0];
+  const uploadFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (files.length === 0) return;
+    setUploading(true);
+    let added = 0;
+    for (const file of files) {
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        toast.error(`${file.name || 'File'} is too large. Maximum size is ${MAX_FILE_MB}MB.`);
+        continue;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await api.post('/uploads', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        setMedia((prev) => [...prev, { url: res.data.url, type: res.data.type }]);
+        added += 1;
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'Failed to upload media');
+      }
+    }
+    setUploading(false);
+    if (added > 0) toast.success(added > 1 ? `${added} files added` : 'Media added');
+  };
+
+  const handleFileSelect = (e) => {
+    uploadFiles(e.target.files);
     e.target.value = '';
-    if (!file) return;
-    if (file.size > MAX_FILE_MB * 1024 * 1024) {
-      return toast.error(`File is too large. Maximum size is ${MAX_FILE_MB}MB.`);
-    }
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-      setUploading(true);
-      const res = await api.post('/uploads', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setMedia((prev) => [...prev, { url: res.data.url, type: res.data.type }]);
-      toast.success('Media added');
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to upload media');
-    } finally {
-      setUploading(false);
-    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragActive) setDragActive(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Ignore "leave" events fired when the cursor moves onto a child element.
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDragActive(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files);
   };
 
   const removeMedia = (url) => setMedia((prev) => prev.filter((m) => m.url !== url));
@@ -241,7 +272,12 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
             </div>
 
             {/* Editor */}
-            <div className="border border-gray-200 rounded-xl p-3 focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent">
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border rounded-xl p-3 transition-colors focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent ${dragActive ? 'border-primary-400 ring-2 ring-primary-200' : 'border-gray-200'}`}
+            >
               <textarea
                 ref={textareaRef}
                 className="w-full resize-none outline-none text-sm min-h-[140px]"
@@ -270,10 +306,28 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
                 </div>
               )}
 
+              {/* Buffer-style drag & drop zone */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className={`mt-3 cursor-pointer flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-6 px-4 text-center transition-colors ${
+                  dragActive
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200 bg-gray-50/60 hover:border-primary-300 hover:bg-gray-50'
+                }`}
+              >
+                <PhotoIcon className="w-6 h-6 text-gray-400" />
+                <p className="text-sm text-gray-600">
+                  <span className="font-semibold text-primary-600">Drag &amp; drop</span>
+                  <span className="text-gray-500"> or </span>
+                  <span className="font-semibold text-primary-600">select a file</span>
+                </p>
+                <p className="text-xs text-gray-400">Images &amp; videos up to {MAX_FILE_MB}MB</p>
+              </div>
+
               {/* Toolbar */}
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                 <div className="flex items-center gap-1 relative">
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelect} />
+                  <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelect} />
                   <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
                     className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50" title="Add image or video">
                     <PhotoIcon className="w-5 h-5" />

@@ -63,7 +63,7 @@ router.get('/facebook', (req, res) => {
   const { token } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = callbackUrl('facebook', 'FACEBOOK_CALLBACK_URL');
-  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish`;
+  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish`;
   res.redirect(fbUrl);
 });
 
@@ -86,33 +86,18 @@ router.get('/facebook/callback', async (req, res) => {
     });
 
     const { access_token } = tokenRes.data;
-
-    // Exchange the short-lived user token for a long-lived one (~60 days).
-    // Page tokens derived from a long-lived user token do not expire, which is
-    // what we want for publishing to the user's Pages.
-    let longLivedToken = access_token;
-    try {
-      const llRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
-        params: {
-          grant_type: 'fb_exchange_token',
-          client_id: process.env.FACEBOOK_APP_ID,
-          client_secret: process.env.FACEBOOK_APP_SECRET,
-          fb_exchange_token: access_token,
-        },
-      });
-      if (llRes.data.access_token) longLivedToken = llRes.data.access_token;
-    } catch (e) {
-      console.error('FB long-lived token exchange failed:', e.response?.data || e.message);
-    }
-
-    // Don't connect the personal profile. Stash the user token so the next step
-    // can list the user's Pages and let them choose which Page(s) to connect.
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { fbConnectToken: longLivedToken },
+    const profileRes = await axios.get('https://graph.facebook.com/me', {
+      params: { access_token, fields: 'id,name,picture' },
     });
 
-    res.redirect(`${FRONTEND}/accounts?select=facebook`);
+    await saveSocialAccount(user.id, 'FACEBOOK', {
+      platformId: profileRes.data.id,
+      name: profileRes.data.name,
+      avatar: profileRes.data.picture?.data?.url,
+      accessToken: access_token,
+    });
+
+    res.redirect(`${FRONTEND}/accounts?connected=facebook`);
   } catch (err) {
     console.error('Facebook OAuth error:', err.message);
     res.redirect(`${FRONTEND}/accounts?error=facebook_failed`);

@@ -3,6 +3,9 @@ const prisma = require('../config/prisma');
 
 const publishers = {
   FACEBOOK: async (account, post) => {
+    // account.platformId is the Page id; account.accessToken is the Page token.
+    // Publishing to a Page (not the personal profile) is the supported path.
+    const pageId = account.platformId;
     const media = Array.isArray(post.mediaUrls) ? post.mediaUrls.filter(Boolean) : [];
 
     if (media.length > 0) {
@@ -11,21 +14,21 @@ const publishers = {
 
       if (isVideo) {
         const res = await axios.post(
-          `https://graph.facebook.com/v18.0/me/videos`,
+          `https://graph.facebook.com/v18.0/${pageId}/videos`,
           { file_url: url, description: post.content, access_token: account.accessToken }
         );
         return res.data.id;
       }
 
       const res = await axios.post(
-        `https://graph.facebook.com/v18.0/me/photos`,
+        `https://graph.facebook.com/v18.0/${pageId}/photos`,
         { url, caption: post.content, access_token: account.accessToken }
       );
       return res.data.post_id || res.data.id;
     }
 
     const res = await axios.post(
-      `https://graph.facebook.com/v18.0/me/feed`,
+      `https://graph.facebook.com/v18.0/${pageId}/feed`,
       { message: post.content, access_token: account.accessToken }
     );
     return res.data.id;

@@ -18,6 +18,7 @@ model User {
   verifyToken   String?
   resetToken    String?
   resetTokenExp DateTime?
+  fbConnectToken String?  @db.Text
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

@@ -63,13 +63,19 @@ router.get('/facebook', (req, res) => {
   const { token } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = callbackUrl('facebook', 'FACEBOOK_CALLBACK_URL');
-  // auth_type=rerequest forces Facebook to show the permission + Page-selection
-  // screen again instead of the streamlined "re-establish your previous settings"
-  // shortcut. Without it, a returning user who previously connected WITHOUT
-  // granting any Page just reuses that empty grant, so /me/accounts comes back
-  // empty and the Page picker shows "No Pages found".
-  const scope = 'pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish';
-  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=${scope}&auth_type=rerequest`;
+  // This is a "Business"-type Facebook app, so it uses **Facebook Login for
+  // Business**. That flow is driven by a Login Configuration (config_id) created
+  // in the App Dashboard — NOT by a raw `scope` list. Passing `scope` (the old
+  // consumer-login flow) is exactly what made /me/accounts come back empty, so
+  // the Page picker showed "No Pages found".
+  //
+  // The configuration "Orciid Publishing" (config_id below) requests
+  // pages_show_list + pages_manage_posts + pages_read_engagement and uses a User
+  // access token, so at login Facebook shows the Page-selection screen and
+  // /me/accounts returns the chosen Page(s) with their Page tokens.
+  // Overridable via FACEBOOK_CONFIG_ID env var if the configuration is recreated.
+  const configId = process.env.FACEBOOK_CONFIG_ID || '2746900285685810';
+  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&config_id=${configId}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&response_type=code`;
   res.redirect(fbUrl);
 });
 

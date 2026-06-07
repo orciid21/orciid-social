@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { LinkIcon, TrashIcon, CheckCircleIcon, ExclamationTriangleIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 
 const PLATFORMS = [
-  { id: 'FACEBOOK', name: 'Facebook', color: '#1877F2', icon: '𝐟', desc: 'Pages & personal profiles' },
+  { id: 'FACEBOOK', name: 'Facebook', color: '#1877F2', icon: '𝐟', desc: 'Publish to your Facebook Pages' },
   { id: 'INSTAGRAM', name: 'Instagram', color: '#E1306C', icon: '📷', desc: 'Business & creator accounts' },
   { id: 'TWITTER', name: 'Twitter / X', color: '#000', icon: '𝕏', desc: 'Posts, replies & threads' },
   { id: 'LINKEDIN', name: 'LinkedIn', color: '#0A66C2', icon: 'in', desc: 'Personal profiles & pages' },
@@ -192,21 +192,26 @@ export default function AccountsPage() {
                   <p className="font-semibold text-gray-900 text-sm">{platform.name}</p>
                   <p className="text-xs text-gray-500">{platform.desc}</p>
                 </div>
-                {isConnected ? (
-                  <span className="badge bg-green-100 text-green-700 flex items-center gap-1">
-                    <CheckCircleIcon className="w-3.5 h-3.5" />
-                    Connected
-                  </span>
-                ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {isConnected && (
+                    <span className="badge bg-green-100 text-green-700 flex items-center gap-1">
+                      <CheckCircleIcon className="w-3.5 h-3.5" />
+                      Connected
+                    </span>
+                  )}
+                  {/* Always offer (re)connect. Facebook in particular needs this:
+                      a personal profile can't publish, so the user must reconnect
+                      and pick a Page — and there was previously no button to do so
+                      once any Facebook account was connected. */}
                   <button
                     onClick={() => handleConnect(platform.id)}
                     disabled={isConnecting}
                     className="btn-secondary text-xs"
                   >
                     <LinkIcon className="w-3.5 h-3.5" />
-                    {isConnecting ? 'Connecting...' : 'Connect'}
+                    {isConnecting ? 'Connecting...' : isConnected ? 'Reconnect' : 'Connect'}
                   </button>
-                )}
+                </div>
               </div>
             );
           })}

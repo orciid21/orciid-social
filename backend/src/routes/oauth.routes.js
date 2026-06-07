@@ -63,7 +63,13 @@ router.get('/facebook', (req, res) => {
   const { token } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = callbackUrl('facebook', 'FACEBOOK_CALLBACK_URL');
-  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish`;
+  // auth_type=rerequest forces Facebook to show the permission + Page-selection
+  // screen again instead of the streamlined "re-establish your previous settings"
+  // shortcut. Without it, a returning user who previously connected WITHOUT
+  // granting any Page just reuses that empty grant, so /me/accounts comes back
+  // empty and the Page picker shows "No Pages found".
+  const scope = 'pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish';
+  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=${scope}&auth_type=rerequest`;
   res.redirect(fbUrl);
 });
 

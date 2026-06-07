@@ -142,6 +142,15 @@ export default function PostsPage() {
                       </span>
                     )}
                   </div>
+                  {post.status === 'FAILED' && (() => {
+                    const reason = post.accounts?.find((a) => a.failReason)?.failReason || post.failReason;
+                    return reason ? (
+                      <p className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-2 py-1 flex items-start gap-1">
+                        <span className="flex-shrink-0">⚠️</span>
+                        <span className="line-clamp-2">{reason}</span>
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
 
                 {/* Actions */}

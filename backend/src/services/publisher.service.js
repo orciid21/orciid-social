@@ -108,9 +108,17 @@ const publishPost = async (postId) => {
         });
         return { platform: account.platform, success: true };
       } catch (err) {
+        // Surface the REAL platform error (e.g. Facebook's Graph API message),
+        // not axios's generic "Request failed with status code 403". This is what
+        // tells the user *why* a post failed — e.g. trying to publish to a personal
+        // profile instead of a Page, or a missing permission.
+        const apiErr = err.response?.data?.error;
+        const reason = apiErr
+          ? `${apiErr.message}${apiErr.code ? ` (#${apiErr.code})` : ''}`
+          : err.message;
         await prisma.postAccount.update({
           where: { id: pa.id },
-          data: { status: 'FAILED', failReason: err.message },
+          data: { status: 'FAILED', failReason: String(reason).slice(0, 500) },
         });
         throw err;
       }

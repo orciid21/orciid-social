@@ -262,7 +262,9 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
       content,
       accountIds: selectedAccounts,
       mediaUrls: media.map((m) => m.url),
-      ...(action === 'schedule' && { scheduledAt }),
+      // datetime-local gives a naive local string; send an absolute ISO instant
+      // so the server can't misread it in its own timezone.
+      ...(action === 'schedule' && { scheduledAt: new Date(scheduledAt).toISOString() }),
     };
 
     try {

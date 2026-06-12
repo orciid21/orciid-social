@@ -4,6 +4,12 @@ const { AppError } = require('../middleware/error.middleware');
 
 const FB_GRAPH = 'https://graph.facebook.com/v18.0';
 
+// Permanent profile-picture URL for a Page. The CDN URL Facebook returns in
+// `picture{url}` is signed and EXPIRES after a while (the sidebar avatar was
+// breaking) — but this Graph endpoint is stable: it 302-redirects to the
+// Page's current picture on every request, no token needed for public Pages.
+const fbPagePicture = (pageId) => `https://graph.facebook.com/${pageId}/picture?type=large`;
+
 // Enumerate every Facebook Page the user can publish to. This is harder than it
 // sounds with Facebook Login for Business:
 //   • /me/accounts only returns Pages the user PERSONALLY administers — a Page
@@ -152,7 +158,7 @@ const getFacebookPages = async (req, res, next) => {
       id: pg.id,
       name: pg.name,
       category: pg.category,
-      avatar: pg.picture?.data?.url || null,
+      avatar: fbPagePicture(pg.id),
       followers: pg.fan_count ?? null,
       alreadyConnected: connectedIds.has(pg.id),
     }));
@@ -203,7 +209,7 @@ const connectFacebookPages = async (req, res, next) => {
         },
         update: {
           name: pg.name,
-          avatar: pg.picture?.data?.url,
+          avatar: fbPagePicture(pg.id),
           accessToken: pg.access_token,
           isActive: true,
         },
@@ -212,7 +218,7 @@ const connectFacebookPages = async (req, res, next) => {
           platform: 'FACEBOOK',
           platformId: pg.id,
           name: pg.name,
-          avatar: pg.picture?.data?.url,
+          avatar: fbPagePicture(pg.id),
           accessToken: pg.access_token,
         },
       });

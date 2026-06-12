@@ -132,9 +132,25 @@ const startServer = () => {
   });
 };
 
+// One-time data fix, safe to re-run on every boot: rewrite Facebook account
+// avatars to the permanent Graph picture endpoint. The signed CDN URLs stored
+// at connect time expire after a while, leaving broken channel pictures —
+// graph.facebook.com/{id}/picture always redirects to the current picture.
+const fixupFacebookAvatars = async () => {
+  try {
+    const n = await prismaClient.$executeRawUnsafe(
+      "UPDATE `SocialAccount` SET `avatar` = CONCAT('https://graph.facebook.com/', `platformId`, '/picture?type=large') " +
+      "WHERE `platform` = 'FACEBOOK' AND (`avatar` IS NULL OR `avatar` NOT LIKE '%/picture%')"
+    );
+    if (n > 0) write(`fixupFacebookAvatars: rewrote ${n} avatar URL(s)`);
+  } catch (err) {
+    write('fixupFacebookAvatars error: ' + (err.message || err));
+  }
+};
+
 // Run the migration first, then start listening — whether it succeeds or not.
 write('Running ensureColumns migration before listen...');
-ensureColumns().finally(startServer);
+ensureColumns().then(fixupFacebookAvatars).finally(startServer);
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');

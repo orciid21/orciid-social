@@ -154,19 +154,32 @@ const fixupFacebookAvatars = async () => {
 // engine instance — but $disconnect() discards the engine and the next query
 // spawns a fresh one, which comes up healthy. So: probe with SELECT 1 and
 // recycle the engine until it answers, instead of serving a broken site.
+const withTimeout = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms)),
+  ]);
+
 const verifyDatabase = async () => {
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await prismaClient.$queryRawUnsafe('SELECT 1');
+      // Hard timeout: after a panic the next query can HANG instead of throw,
+      // which would block boot forever and leave the whole site 503.
+      await withTimeout(prismaClient.$queryRawUnsafe('SELECT 1'), 8000, 'db probe');
       write('Database check OK (attempt ' + attempt + ')');
       return;
     } catch (err) {
       write('Database check failed (attempt ' + attempt + '): ' + String(err.message || err).slice(0, 160));
-      try { await prismaClient.$disconnect(); } catch (e) {}
+      try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
-  write('Database still failing after 5 attempts — starting anyway');
+  // The engine is unrecoverable inside this process — a brand-new process is
+  // the only cure we have seen work. Exit nonzero so the platform supervisor
+  // starts a fresh one; the site is already down at this point, so this can
+  // only improve things.
+  write('Database engine unrecoverable after 3 attempts — exiting for a clean process restart');
+  process.exit(1);
 };
 
 // Run the migration first, then start listening — whether it succeeds or not.

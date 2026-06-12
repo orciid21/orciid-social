@@ -160,31 +160,40 @@ const withTimeout = (promise, ms, label) =>
     new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms)),
   ]);
 
-const verifyDatabase = async () => {
-  for (let attempt = 1; attempt <= 3; attempt++) {
+// Matches Prisma's dead-engine state only — connectivity blips (MySQL restart,
+// network) must NOT kill the process; they recover in place once the DB is back.
+const ENGINE_PANIC_RE = /timer has gone away|PANIC/i;
+
+const verifyDatabaseInBackground = async () => {
+  for (let attempt = 1; ; attempt++) {
     try {
-      // Hard timeout: after a panic the next query can HANG instead of throw,
-      // which would block boot forever and leave the whole site 503.
+      // Hard timeout: after a panic the next query can HANG instead of throw.
       await withTimeout(prismaClient.$queryRawUnsafe('SELECT 1'), 8000, 'db probe');
       write('Database check OK (attempt ' + attempt + ')');
-      return;
+      return true;
     } catch (err) {
-      write('Database check failed (attempt ' + attempt + '): ' + String(err.message || err).slice(0, 160));
+      const msg = String(err.message || err);
+      write('Database check failed (attempt ' + attempt + '): ' + msg.slice(0, 160));
+      // Recycle the engine: $disconnect discards it, the next query spawns a new one.
       try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
-      await new Promise((r) => setTimeout(r, 2000));
+      if (ENGINE_PANIC_RE.test(msg) && attempt >= 2) {
+        // The panicked engine never recovers inside this process — the only
+        // observed cure is a brand-new process, which the platform spawns on
+        // the next request after we exit.
+        write('Engine panic is unrecoverable in-process — exiting so a fresh process is spawned');
+        process.exit(1);
+      }
+      await new Promise((r) => setTimeout(r, attempt >= 5 ? 15000 : 2000));
     }
   }
-  // The engine is unrecoverable inside this process — a brand-new process is
-  // the only cure we have seen work. Exit nonzero so the platform supervisor
-  // starts a fresh one; the site is already down at this point, so this can
-  // only improve things.
-  write('Database engine unrecoverable after 3 attempts — exiting for a clean process restart');
-  process.exit(1);
 };
 
-// Run the migration first, then start listening — whether it succeeds or not.
-write('Running ensureColumns migration before listen...');
-verifyDatabase().then(ensureColumns).then(fixupFacebookAvatars).finally(startServer);
+// LISTEN FIRST — the platform proxy 503s the whole site if the port doesn't
+// open within seconds, so nothing slow (DB probes, migrations) may run before
+// startServer(). They all run in the background right after.
+write('Starting server immediately; DB verification runs in background...');
+startServer();
+verifyDatabaseInBackground().then(ensureColumns).then(fixupFacebookAvatars);
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');

@@ -1,10 +1,6 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
-const {
-  exchangeLongLivedToken,
-  findInstagramBusinessAccount,
-} = require('../services/facebook.service');
 
 // Helper to get user from token in query string (passed during OAuth redirect)
 const getUserFromToken = async (token) => {
@@ -242,62 +238,80 @@ router.get('/linkedin/callback', async (req, res) => {
   }
 });
 
-// --- Instagram (via Facebook Login — Instagram Graph API) ---
-// Requires an Instagram BUSINESS/CREATOR account linked to a Facebook Page.
-// Flow: FB OAuth -> list Pages -> find the Page's linked instagram_business_account.
-// The Page access token (not the user token) is what publishes to Instagram.
+// --- Instagram (Instagram Login API — the Buffer-style direct flow) ---
+// The user logs in with their INSTAGRAM account on instagram.com and approves
+// the consent screen — no Facebook Page linkage required. Needs the app's
+// "Instagram > API setup with Instagram login" product: its own app id/secret
+// and the redirect URL registered there. Tokens live on graph.instagram.com.
+const IG_LOGIN_APP_ID = process.env.INSTAGRAM_APP_ID || '1402647338362389'; // ORCiiD Chat-IG
+const IG_GRAPH = 'https://graph.instagram.com';
+
 router.get('/instagram', (req, res) => {
   const { token } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
-  const appId = process.env.INSTAGRAM_APP_ID || process.env.FACEBOOK_APP_ID;
   const redirect = process.env.INSTAGRAM_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/instagram/callback`;
-  const scope = 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management';
-  const igUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&scope=${scope}`;
+  // Publishing needs only basic + content_publish; a shorter consent screen
+  // converts better. Comments/messages scopes can be added when those ship.
+  const scope = 'instagram_business_basic,instagram_business_content_publish';
+  const igUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_LOGIN_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
   res.redirect(igUrl);
 });
 
 router.get('/instagram/callback', async (req, res) => {
   try {
-    const { code, state } = req.query;
+    const { code, state, error_description: errDesc } = req.query;
+    if (!code) {
+      console.error('Instagram login denied/failed:', errDesc || req.query.error || 'no code');
+      return res.redirect(`${FRONTEND}/accounts?error=instagram_failed`);
+    }
     const { token } = JSON.parse(Buffer.from(state, 'base64').toString());
     const user = await getUserFromToken(token);
     if (!user) return res.redirect(`${FRONTEND}/accounts?error=auth_failed`);
 
     const axios = require('axios').default;
-    const appId = process.env.INSTAGRAM_APP_ID || process.env.FACEBOOK_APP_ID;
-    const appSecret = process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET;
+    const appSecret = process.env.INSTAGRAM_APP_SECRET;
+    if (!appSecret) {
+      console.error('INSTAGRAM_APP_SECRET is not set — add it in Hostinger env vars');
+      return res.redirect(`${FRONTEND}/accounts?error=instagram_not_configured`);
+    }
     const redirect = process.env.INSTAGRAM_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/instagram/callback`;
 
-    // 1. Exchange code for a user access token, then upgrade it to a long-lived
-    //    one — Page tokens derived from a short-lived user token die within the
-    //    hour, which would silently break Instagram publishing later.
-    const tokenRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
-      params: { client_id: appId, client_secret: appSecret, redirect_uri: redirect, code },
-    });
-    const userToken = await exchangeLongLivedToken(tokenRes.data.access_token);
+    // 1. Exchange the code for a short-lived Instagram user token.
+    const tokenRes = await axios.post(
+      'https://api.instagram.com/oauth/access_token',
+      new URLSearchParams({
+        client_id: IG_LOGIN_APP_ID,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: redirect,
+        code,
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    const shortToken = tokenRes.data.access_token;
 
-    // 2. Find a Page with a linked Instagram business account. /me/accounts is
-    //    EMPTY for Business-portfolio Pages (same root cause as the Facebook
-    //    "No Pages found" bug), so use the shared granular-scopes discovery and
-    //    ask each manageable Page directly.
-    const found = await findInstagramBusinessAccount(userToken);
-    if (!found) {
-      return res.redirect(`${FRONTEND}/accounts?error=no_instagram_business_account`);
-    }
-    const { page: pageWithIg, igId } = found;
-
-    // 3. Fetch the IG business account details (use the Page token going forward)
-    const igRes = await axios.get(`https://graph.facebook.com/v18.0/${igId}`, {
-      params: { access_token: pageWithIg.access_token, fields: 'id,username,name,profile_picture_url' },
+    // 2. Upgrade to a long-lived token (~60 days) — short-lived ones die in an
+    //    hour and would silently break publishing.
+    const llRes = await axios.get(`${IG_GRAPH}/access_token`, {
+      params: { grant_type: 'ig_exchange_token', client_secret: appSecret, access_token: shortToken },
     });
-    const ig = igRes.data;
+    const accessToken = llRes.data.access_token || shortToken;
+    const expiresIn = llRes.data.expires_in;
+
+    // 3. Fetch the professional account's profile.
+    const meRes = await axios.get(`${IG_GRAPH}/me`, {
+      params: { fields: 'user_id,username,name,profile_picture_url', access_token: accessToken },
+    });
+    const ig = meRes.data;
+    const igId = String(ig.user_id || ig.id);
 
     await saveSocialAccount(user.id, 'INSTAGRAM', {
-      platformId: ig.id,
+      platformId: igId,
       name: ig.name || ig.username,
       username: ig.username,
       avatar: ig.profile_picture_url,
-      accessToken: pageWithIg.access_token, // Page token publishes to IG
+      accessToken,
+      tokenExpiry: expiresIn ? new Date(Date.now() + expiresIn * 1000) : undefined,
     });
 
     res.redirect(`${FRONTEND}/accounts?connected=instagram`);

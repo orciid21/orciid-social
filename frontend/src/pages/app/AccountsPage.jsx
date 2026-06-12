@@ -19,6 +19,9 @@ export default function AccountsPage() {
   const [connecting, setConnecting] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Instagram connect explainer (Buffer-style "Professional vs Personal")
+  const [igModalOpen, setIgModalOpen] = useState(false);
+
   // Facebook Page picker
   const [fbModalOpen, setFbModalOpen] = useState(false);
   const [fbPages, setFbPages] = useState([]);
@@ -109,11 +112,7 @@ export default function AccountsPage() {
     }
   };
 
-  const handleConnect = async (platformId) => {
-    if (platformId === 'TIKTOK') {
-      toast('TikTok integration coming soon!', { icon: '🚧' });
-      return;
-    }
+  const startConnect = async (platformId) => {
     try {
       setConnecting(platformId);
       const res = await api.get(`/social/connect/${platformId}`);
@@ -122,6 +121,20 @@ export default function AccountsPage() {
       toast.error('Failed to start OAuth flow');
       setConnecting(null);
     }
+  };
+
+  const handleConnect = (platformId) => {
+    if (platformId === 'TIKTOK') {
+      toast('TikTok integration coming soon!', { icon: '🚧' });
+      return;
+    }
+    // Buffer-style explainer first: Instagram needs a Professional account,
+    // and the user should know what they're choosing before the OAuth screen.
+    if (platformId === 'INSTAGRAM') {
+      setIgModalOpen(true);
+      return;
+    }
+    startConnect(platformId);
   };
 
   const handleDisconnect = async (accountId, name) => {
@@ -333,6 +346,66 @@ export default function AccountsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Instagram connect explainer — Buffer-style account-type chooser */}
+      {igModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIgModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl">
+            {/* Header */}
+            <div className="flex items-start justify-between px-6 pt-6">
+              <div className="flex items-center gap-3">
+                <img src={PLATFORM_LOGOS.INSTAGRAM} alt="Instagram" className="w-9 h-9 rounded-xl object-contain" />
+                <div>
+                  <h3 className="font-bold text-gray-900 text-lg">How would you like to connect your Instagram Account?</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Features depend on the type of Instagram account you have.</p>
+                </div>
+              </div>
+              <button onClick={() => setIgModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body — two cards */}
+            <div className="grid sm:grid-cols-2 gap-4 p-6">
+              <div className="border-2 border-primary-200 rounded-2xl p-5 flex flex-col">
+                <p className="font-semibold text-gray-900">Professional <span className="font-normal text-gray-500">(Business &amp; Creator)</span></p>
+                <span className="mt-2 inline-flex self-start items-center gap-1 text-xs font-medium text-green-700 bg-green-100 rounded-full px-2.5 py-1">
+                  ✓ Automatic Posting
+                </span>
+                <ul className="mt-4 space-y-2.5 text-sm text-gray-700 flex-1">
+                  <li className="flex gap-2"><CheckIcon className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" strokeWidth={3} /><span><b>Automatic posting</b> — you schedule, we post</span></li>
+                  <li className="flex gap-2"><CheckIcon className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" strokeWidth={3} /><span><b>Publish now</b> — photos &amp; Reels from Orciid</span></li>
+                  <li className="flex gap-2"><CheckIcon className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" strokeWidth={3} /><span><b>No Facebook Page needed</b> — sign in with Instagram</span></li>
+                </ul>
+                <button
+                  onClick={() => { setIgModalOpen(false); startConnect('INSTAGRAM'); }}
+                  disabled={connecting === 'INSTAGRAM'}
+                  className="mt-5 w-full rounded-xl bg-green-200 hover:bg-green-300 text-gray-900 font-semibold text-sm py-3 transition-colors disabled:opacity-60"
+                >
+                  {connecting === 'INSTAGRAM' ? 'Connecting…' : 'Connect to Instagram'}
+                </button>
+              </div>
+
+              <div className="border border-gray-200 rounded-2xl p-5 flex flex-col">
+                <p className="font-semibold text-gray-900">Personal</p>
+                <span className="mt-2 inline-flex self-start items-center gap-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">
+                  Not supported yet
+                </span>
+                <p className="mt-4 text-sm text-gray-600 flex-1">
+                  Automatic posting requires a <b>Professional</b> account. Switching is free and takes a minute:
+                  open Instagram → <b>Settings</b> → <b>Account type and tools</b> → <b>Switch to professional account</b>, then come back and connect.
+                </p>
+              </div>
+            </div>
+
+            <p className="px-6 pb-6 text-xs text-gray-500 flex items-start gap-1.5">
+              <span>ⓘ</span>
+              <span>You&apos;ll sign in with your <b>Instagram</b> account and approve access on Instagram&apos;s own screen — no Facebook Page required.</span>
+            </p>
           </div>
         </div>
       )}

@@ -66,14 +66,34 @@ const publishers = {
     if (!post.mediaUrls || post.mediaUrls.length === 0) {
       throw new Error('Instagram requires at least one image');
     }
-    // Create container
+    // Accounts are connected via the Instagram Login API (direct instagram.com
+    // OAuth) — their tokens only work on graph.instagram.com, NOT
+    // graph.facebook.com. platformId is the IG professional account id.
+    const url = post.mediaUrls[0];
+    const isVideo = /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(url);
+
+    // Create the media container (REELS is the supported feed video type).
     const containerRes = await axios.post(
-      `https://graph.facebook.com/v18.0/${account.platformId}/media`,
-      { image_url: post.mediaUrls[0], caption: post.content, access_token: account.accessToken }
+      `https://graph.instagram.com/v21.0/${account.platformId}/media`,
+      isVideo
+        ? { media_type: 'REELS', video_url: url, caption: post.content, access_token: account.accessToken }
+        : { image_url: url, caption: post.content, access_token: account.accessToken }
     );
-    // Publish container
+
+    // Videos process asynchronously — wait until the container is ready.
+    if (isVideo) {
+      for (let i = 0; i < 30; i++) {
+        const st = await axios.get(`https://graph.instagram.com/v21.0/${containerRes.data.id}`, {
+          params: { fields: 'status_code', access_token: account.accessToken },
+        });
+        if (st.data.status_code === 'FINISHED') break;
+        if (st.data.status_code === 'ERROR') throw new Error('Instagram could not process the video');
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+
     const publishRes = await axios.post(
-      `https://graph.facebook.com/v18.0/${account.platformId}/media_publish`,
+      `https://graph.instagram.com/v21.0/${account.platformId}/media_publish`,
       { creation_id: containerRes.data.id, access_token: account.accessToken }
     );
     return publishRes.data.id;

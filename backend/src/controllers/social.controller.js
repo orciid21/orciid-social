@@ -194,10 +194,48 @@ const connectFacebookPages = async (req, res, next) => {
   }
 };
 
+// TEMP DEBUG: GET /social/facebook/debug
+// Dumps raw Graph responses to find WHERE the granted Page lives (e.g. a
+// Business-owned Page won't show in the personal /me/accounts edge). Tokens are
+// redacted. REMOVE once the Page-listing path is fixed.
+const debugFacebook = async (req, res) => {
+  const userToken = req.user.fbConnectToken;
+  if (!userToken) return res.status(400).json({ error: 'No fbConnectToken on user' });
+
+  const safe = async (label, url, params) => {
+    try {
+      const r = await axios.get(url, { params: { access_token: userToken, ...params } });
+      return { label, ok: true, data: r.data };
+    } catch (e) {
+      return { label, ok: false, error: e.response?.data?.error || String(e) };
+    }
+  };
+
+  const out = {};
+  out.me = await safe('me', `${FB_GRAPH}/me`, { fields: 'id,name' });
+  out.permissions = await safe('permissions', `${FB_GRAPH}/me/permissions`, {});
+  out.accounts = await safe('accounts', `${FB_GRAPH}/me/accounts`, { fields: 'id,name,access_token', limit: 100 });
+  out.businesses = await safe('businesses', `${FB_GRAPH}/me/businesses`, { fields: 'id,name', limit: 100 });
+  out.hrSocietyDirect = await safe('hr_direct', `${FB_GRAPH}/204598046065905`, { fields: 'id,name,access_token' });
+
+  const bizPages = [];
+  if (out.businesses.ok) {
+    for (const b of out.businesses.data.data || []) {
+      bizPages.push(await safe(`owned_pages:${b.name}`, `${FB_GRAPH}/${b.id}/owned_pages`, { fields: 'id,name,access_token', limit: 100 }));
+      bizPages.push(await safe(`client_pages:${b.name}`, `${FB_GRAPH}/${b.id}/client_pages`, { fields: 'id,name,access_token', limit: 100 }));
+    }
+  }
+  out.bizPages = bizPages;
+
+  const redacted = JSON.parse(JSON.stringify(out, (k, v) => (k === 'access_token' ? '[PRESENT]' : v)));
+  res.json(redacted);
+};
+
 module.exports = {
   getAccounts,
   disconnectAccount,
   getConnectUrl,
   getFacebookPages,
   connectFacebookPages,
+  debugFacebook,
 };

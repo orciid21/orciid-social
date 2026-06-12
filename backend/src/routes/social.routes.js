@@ -6,11 +6,13 @@ const {
   getConnectUrl,
   getFacebookPages,
   connectFacebookPages,
+  debugFacebook,
 } = require('../controllers/social.controller');
 
 router.use(authenticate);
 
 router.get('/', getAccounts);
+router.get('/facebook/debug', debugFacebook);
 router.get('/facebook/pages', getFacebookPages);
 router.post('/facebook/pages/connect', connectFacebookPages);
 router.get('/connect/:platform', getConnectUrl);

@@ -2,6 +2,18 @@ const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
 const schedulerService = require('../services/scheduler.service');
 
+// Fields of SocialAccount that are safe to send to the browser. Never include
+// accessToken/refreshToken — Page tokens must stay server-side only.
+const SAFE_SOCIAL_ACCOUNT_SELECT = {
+  id: true,
+  platform: true,
+  platformId: true,
+  name: true,
+  username: true,
+  avatar: true,
+  isActive: true,
+};
+
 const createPost = async (req, res, next) => {
   try {
     const { content, mediaUrls = [], accountIds, scheduledAt, workspaceId } = req.body;
@@ -38,7 +50,7 @@ const createPost = async (req, res, next) => {
         },
       },
       include: {
-        accounts: { include: { socialAccount: true } },
+        accounts: { include: { socialAccount: { select: SAFE_SOCIAL_ACCOUNT_SELECT } } },
       },
     });
 
@@ -66,7 +78,7 @@ const getPosts = async (req, res, next) => {
     const [posts, total] = await Promise.all([
       prisma.post.findMany({
         where,
-        include: { accounts: { include: { socialAccount: true } }, analytics: true },
+        include: { accounts: { include: { socialAccount: { select: SAFE_SOCIAL_ACCOUNT_SELECT } } }, analytics: true },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: Number(limit),
@@ -84,7 +96,7 @@ const getPost = async (req, res, next) => {
   try {
     const post = await prisma.post.findFirst({
       where: { id: req.params.id, userId: req.user.id },
-      include: { accounts: { include: { socialAccount: true } }, analytics: true },
+      include: { accounts: { include: { socialAccount: { select: SAFE_SOCIAL_ACCOUNT_SELECT } } }, analytics: true },
     });
     if (!post) throw new AppError('Post not found', 404);
     res.json(post);
@@ -110,7 +122,7 @@ const updatePost = async (req, res, next) => {
         ...(mediaUrls !== undefined && { mediaUrls }),
         ...(scheduledAt !== undefined && { scheduledAt: new Date(scheduledAt), status: 'SCHEDULED' }),
       },
-      include: { accounts: { include: { socialAccount: true } } },
+      include: { accounts: { include: { socialAccount: { select: SAFE_SOCIAL_ACCOUNT_SELECT } } } },
     });
 
     if (scheduledAt) {
@@ -144,7 +156,7 @@ const publishNow = async (req, res, next) => {
   try {
     const post = await prisma.post.findFirst({
       where: { id: req.params.id, userId: req.user.id },
-      include: { accounts: { include: { socialAccount: true } } },
+      include: { accounts: { include: { socialAccount: { select: SAFE_SOCIAL_ACCOUNT_SELECT } } } },
     });
     if (!post) throw new AppError('Post not found', 404);
     if (post.status === 'PUBLISHED') throw new AppError('Already published', 400);
@@ -167,7 +179,7 @@ const getCalendar = async (req, res, next) => {
         userId: req.user.id,
         scheduledAt: { gte: start, lte: end },
       },
-      include: { accounts: { include: { socialAccount: true } } },
+      include: { accounts: { include: { socialAccount: { select: SAFE_SOCIAL_ACCOUNT_SELECT } } } },
       orderBy: { scheduledAt: 'asc' },
     });
 

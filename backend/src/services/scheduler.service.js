@@ -5,13 +5,15 @@ const publisherService = require('./publisher.service');
 // In-memory map of scheduled jobs: postId → cron task
 const scheduledJobs = new Map();
 
-// On server start, reload all pending scheduled posts from DB
+// On server start, reload ALL pending scheduled posts from DB — including
+// past-due ones. Deploys restart this process; a post whose time arrived while
+// the server was down would otherwise stay SCHEDULED forever. schedulePost()
+// publishes past-due posts immediately, so no extra handling is needed here.
 const initScheduler = async () => {
   try {
     const pendingPosts = await prisma.post.findMany({
       where: {
         status: 'SCHEDULED',
-        scheduledAt: { gte: new Date() },
       },
     });
 

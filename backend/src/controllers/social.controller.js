@@ -61,6 +61,18 @@ const getAccounts = async (req, res, next) => {
     const accounts = await prisma.socialAccount.findMany({
       where: { userId: req.user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      // Never send accessToken/refreshToken to the browser — Page tokens are
+      // server-side secrets.
+      select: {
+        id: true,
+        platform: true,
+        platformId: true,
+        name: true,
+        username: true,
+        avatar: true,
+        isActive: true,
+        createdAt: true,
+      },
     });
     res.json(accounts);
   } catch (err) {

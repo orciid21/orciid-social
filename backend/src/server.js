@@ -148,9 +148,30 @@ const fixupFacebookAvatars = async () => {
   }
 };
 
+// Some deploy restarts leave the Prisma query engine in a dead state where
+// EVERY query throws "PANIC: timer has gone away" (surfaced to users as 500s
+// and bogus "Invalid token" 401s). Prisma calls it non-recoverable for that
+// engine instance — but $disconnect() discards the engine and the next query
+// spawns a fresh one, which comes up healthy. So: probe with SELECT 1 and
+// recycle the engine until it answers, instead of serving a broken site.
+const verifyDatabase = async () => {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      await prismaClient.$queryRawUnsafe('SELECT 1');
+      write('Database check OK (attempt ' + attempt + ')');
+      return;
+    } catch (err) {
+      write('Database check failed (attempt ' + attempt + '): ' + String(err.message || err).slice(0, 160));
+      try { await prismaClient.$disconnect(); } catch (e) {}
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  write('Database still failing after 5 attempts — starting anyway');
+};
+
 // Run the migration first, then start listening — whether it succeeds or not.
 write('Running ensureColumns migration before listen...');
-ensureColumns().then(fixupFacebookAvatars).finally(startServer);
+verifyDatabase().then(ensureColumns).then(fixupFacebookAvatars).finally(startServer);
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');

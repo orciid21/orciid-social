@@ -5,6 +5,9 @@ import toast from 'react-hot-toast';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, getDay } from 'date-fns';
 
+import { PLATFORM_LOGOS } from '../../utils/platforms';
+
+// Colors for the tiny per-day chips in the month grid (logos don't fit there).
 const PLATFORM_BG = { FACEBOOK: '#1877F2', INSTAGRAM: '#E1306C', TWITTER: '#000', LINKEDIN: '#0A66C2', TIKTOK: '#000' };
 
 export default function CalendarPage() {
@@ -140,11 +143,16 @@ export default function CalendarPage() {
                 <div key={post.id} className="border border-gray-100 rounded-xl p-3">
                   <div className="flex items-center gap-2 mb-2">
                     {post.accounts?.map((pa) => (
-                      <div
-                        key={pa.id}
-                        className="w-5 h-5 rounded-full"
-                        style={{ backgroundColor: PLATFORM_BG[pa.socialAccount?.platform] || '#666' }}
-                      />
+                      PLATFORM_LOGOS[pa.socialAccount?.platform] ? (
+                        <img
+                          key={pa.id}
+                          src={PLATFORM_LOGOS[pa.socialAccount?.platform]}
+                          alt={pa.socialAccount?.platform}
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div key={pa.id} className="w-5 h-5 rounded-full bg-gray-400" />
+                      )
                     ))}
                     <span className="text-xs text-gray-500">
                       {post.scheduledAt ? format(new Date(post.scheduledAt), 'h:mm a') : ''}

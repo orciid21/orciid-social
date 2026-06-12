@@ -8,6 +8,7 @@ import {
   ClockIcon, CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { PLATFORM_LOGOS } from '../../utils/platforms';
 
 const mockChartData = [
   { day: 'Mon', likes: 120, reach: 450 },
@@ -25,14 +26,6 @@ const PLATFORM_COLORS = {
   TWITTER: 'bg-sky-500',
   LINKEDIN: 'bg-blue-700',
   TIKTOK: 'bg-gray-900',
-};
-
-const PLATFORM_ICONS = {
-  FACEBOOK: '🔵',
-  INSTAGRAM: '📸',
-  TWITTER: '🐦',
-  LINKEDIN: '💼',
-  TIKTOK: '🎵',
 };
 
 function getGreeting() {
@@ -295,8 +288,15 @@ export default function DashboardPage() {
                         {post.status}
                       </span>
                       {post.accounts?.map((a) => (
-                        <span key={a.id} className="text-xs text-gray-400">
-                          {PLATFORM_ICONS[a.socialAccount?.platform] || ''} {a.socialAccount?.platform}
+                        <span key={a.id} className="text-xs text-gray-400 inline-flex items-center gap-1">
+                          {PLATFORM_LOGOS[a.socialAccount?.platform] && (
+                            <img
+                              src={PLATFORM_LOGOS[a.socialAccount?.platform]}
+                              alt=""
+                              className="w-3.5 h-3.5 rounded-[3px] object-cover"
+                            />
+                          )}
+                          {a.socialAccount?.platform}
                         </span>
                       ))}
                     </div>

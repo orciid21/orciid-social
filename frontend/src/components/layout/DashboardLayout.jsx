@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 import api from '../../utils/api';
 import ComposeModal from '../compose/ComposeModal';
+import ChannelAvatar from '../ChannelAvatar';
 import {
   HomeIcon, PencilSquareIcon, CalendarIcon, ChartBarIcon,
   LinkIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon,
@@ -18,14 +19,6 @@ const navItems = [
   { to: '/accounts', label: 'Accounts', icon: LinkIcon },
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ];
-
-const PLATFORM_META = {
-  FACEBOOK: { bg: '#1877F2', short: 'FB' },
-  INSTAGRAM: { bg: '#E1306C', short: 'IG' },
-  TWITTER: { bg: '#000', short: 'X' },
-  LINKEDIN: { bg: '#0A66C2', short: 'LI' },
-  TIKTOK: { bg: '#000', short: 'TK' },
-};
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -169,36 +162,16 @@ export default function DashboardLayout() {
 
             {channelsOpen && (
               <div className="mt-1 space-y-0.5">
-                {accounts.map((acc) => {
-                  const meta = PLATFORM_META[acc.platform] || {};
-                  return (
-                    <button
-                      key={acc.id}
-                      onClick={() => navigate('/accounts')}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
-                    >
-                      <div className="relative w-7 h-7 flex-shrink-0">
-                        {acc.avatar ? (
-                          <img src={acc.avatar} alt="" className="w-7 h-7 rounded-md object-cover" />
-                        ) : (
-                          <div
-                            className="w-7 h-7 rounded-md flex items-center justify-center text-white text-[10px] font-bold"
-                            style={{ backgroundColor: meta.bg || '#888' }}
-                          >
-                            {(acc.name || '?').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div
-                          className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[7px] font-bold border border-white"
-                          style={{ backgroundColor: meta.bg || '#888' }}
-                        >
-                          {meta.short}
-                        </div>
-                      </div>
-                      <span className="flex-1 min-w-0 text-sm text-gray-700 truncate">{acc.name}</span>
-                    </button>
-                  );
-                })}
+                {accounts.map((acc) => (
+                  <button
+                    key={acc.id}
+                    onClick={() => navigate('/accounts')}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
+                  >
+                    <ChannelAvatar account={acc} size="w-7 h-7" badge="w-3.5 h-3.5" rounded="rounded-md" />
+                    <span className="flex-1 min-w-0 text-sm text-gray-700 truncate">{acc.name}</span>
+                  </button>
+                ))}
 
                 <button
                   onClick={() => navigate('/accounts')}

@@ -7,18 +7,12 @@ import {
   XMarkIcon, DocumentIcon,
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
+import ChannelAvatar from '../../components/ChannelAvatar';
+import { PLATFORM_META as PLATFORM_ICONS } from '../../utils/platforms';
 
 const PLATFORM_LIMITS = {
   TWITTER: 280, FACEBOOK: 63206, INSTAGRAM: 2200,
   LINKEDIN: 3000, TIKTOK: 2200,
-};
-
-const PLATFORM_ICONS = {
-  FACEBOOK: { label: 'Facebook', bg: '#1877F2', short: 'FB' },
-  INSTAGRAM: { label: 'Instagram', bg: '#E1306C', short: 'IG' },
-  TWITTER: { label: 'Twitter/X', bg: '#000', short: 'X' },
-  LINKEDIN: { label: 'LinkedIn', bg: '#0A66C2', short: 'LI' },
-  TIKTOK: { label: 'TikTok', bg: '#000', short: 'TK' },
 };
 
 const MAX_FILE_MB = 10;
@@ -260,12 +254,7 @@ export default function ComposePage() {
                         selected ? 'border-primary-300 bg-primary-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                       }`}
                     >
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                        style={{ backgroundColor: meta.bg }}
-                      >
-                        {meta.short}
-                      </div>
+                      <ChannelAvatar account={acc} size="w-8 h-8" badge="w-3.5 h-3.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{acc.name}</p>
                         <p className="text-xs text-gray-500">{meta.label}</p>

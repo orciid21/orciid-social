@@ -3,19 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import ChannelAvatar from '../ChannelAvatar';
+import { PLATFORM_META } from '../../utils/platforms';
 import {
   PhotoIcon, FaceSmileIcon, HashtagIcon, CalendarIcon,
   PaperAirplaneIcon, XMarkIcon, DocumentIcon,
   HandThumbUpIcon, ChatBubbleOvalLeftIcon, ShareIcon, HeartIcon,
 } from '@heroicons/react/24/outline';
-
-const PLATFORM_META = {
-  FACEBOOK: { label: 'Facebook', bg: '#1877F2', short: 'FB' },
-  INSTAGRAM: { label: 'Instagram', bg: '#E1306C', short: 'IG' },
-  TWITTER: { label: 'Twitter/X', bg: '#000', short: 'X' },
-  LINKEDIN: { label: 'LinkedIn', bg: '#0A66C2', short: 'LI' },
-  TIKTOK: { label: 'TikTok', bg: '#000', short: 'TK' },
-};
 
 const PLATFORM_LIMITS = {
   TWITTER: 280, FACEBOOK: 63206, INSTAGRAM: 2200, LINKEDIN: 3000, TIKTOK: 2200,
@@ -74,23 +68,7 @@ const downscaleImage = (file) =>
   });
 
 function Avatar({ account, size = 'w-10 h-10' }) {
-  const meta = PLATFORM_META[account.platform] || {};
-  return (
-    <div className={`relative ${size} flex-shrink-0`}>
-      {account.avatar ? (
-        <img src={account.avatar} alt={account.name} className="w-full h-full rounded-lg object-cover" />
-      ) : (
-        <div className="w-full h-full rounded-lg flex items-center justify-center text-white font-bold text-xs"
-          style={{ backgroundColor: meta.bg || '#888' }}>
-          {(account.name || '?').charAt(0).toUpperCase()}
-        </div>
-      )}
-      <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold border-2 border-white"
-        style={{ backgroundColor: meta.bg || '#888' }}>
-        {meta.short}
-      </div>
-    </div>
-  );
+  return <ChannelAvatar account={account} size={size} badge="w-4 h-4" />;
 }
 
 function PreviewCard({ account, content, media }) {

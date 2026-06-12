@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import { LinkIcon, TrashIcon, CheckCircleIcon, ExclamationTriangleIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { PLATFORM_LOGOS } from '../../utils/platforms';
 
 const PLATFORMS = [
-  { id: 'FACEBOOK', name: 'Facebook', color: '#1877F2', icon: '𝐟', desc: 'Publish to your Facebook Pages' },
-  { id: 'INSTAGRAM', name: 'Instagram', color: '#E1306C', icon: '📷', desc: 'Business & creator accounts' },
-  { id: 'TWITTER', name: 'Twitter / X', color: '#000', icon: '𝕏', desc: 'Posts, replies & threads' },
-  { id: 'LINKEDIN', name: 'LinkedIn', color: '#0A66C2', icon: 'in', desc: 'Personal profiles & pages' },
-  { id: 'TIKTOK', name: 'TikTok', color: '#000', icon: '♪', desc: 'Video posts (coming soon)' },
+  { id: 'FACEBOOK', name: 'Facebook', desc: 'Publish to your Facebook Pages' },
+  { id: 'INSTAGRAM', name: 'Instagram', desc: 'Business & creator accounts' },
+  { id: 'TWITTER', name: 'Twitter / X', desc: 'Posts, replies & threads' },
+  { id: 'LINKEDIN', name: 'LinkedIn', desc: 'Personal profiles & pages' },
+  { id: 'TIKTOK', name: 'TikTok', desc: 'Video posts (coming soon)' },
 ];
 
 export default function AccountsPage() {
@@ -147,12 +148,11 @@ export default function AccountsPage() {
               const platform = PLATFORMS.find((p) => p.id === acc.platform);
               return (
                 <div key={acc.id} className="flex items-center gap-4 px-5 py-4">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                    style={{ backgroundColor: platform?.color }}
-                  >
-                    {platform?.icon}
-                  </div>
+                  <img
+                    src={PLATFORM_LOGOS[acc.platform]}
+                    alt={platform?.name}
+                    className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">{acc.name}</p>
                     <p className="text-xs text-gray-500">{platform?.name} · {acc.username ? `@${acc.username}` : 'Connected'}</p>
@@ -182,12 +182,11 @@ export default function AccountsPage() {
             const isConnecting = connecting === platform.id;
             return (
               <div key={platform.id} className="flex items-center gap-4 px-5 py-4">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  style={{ backgroundColor: platform.color }}
-                >
-                  {platform.icon}
-                </div>
+                <img
+                  src={PLATFORM_LOGOS[platform.id]}
+                  alt={platform.name}
+                  className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
+                />
                 <div className="flex-1">
                   <p className="font-semibold text-gray-900 text-sm">{platform.name}</p>
                   <p className="text-xs text-gray-500">{platform.desc}</p>

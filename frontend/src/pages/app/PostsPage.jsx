@@ -7,6 +7,7 @@ import {
   DocumentTextIcon, FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
+import { PLATFORM_LOGOS } from '../../utils/platforms';
 
 const STATUS_COLORS = {
   DRAFT: 'bg-gray-100 text-gray-600',
@@ -15,13 +16,6 @@ const STATUS_COLORS = {
   FAILED: 'bg-red-100 text-red-700',
   CANCELED: 'bg-gray-100 text-gray-500',
 };
-
-const PLATFORM_BG = {
-  FACEBOOK: '#1877F2', INSTAGRAM: '#E1306C', TWITTER: '#000',
-  LINKEDIN: '#0A66C2', TIKTOK: '#000',
-};
-
-const PLATFORM_SHORT = { FACEBOOK: 'FB', INSTAGRAM: 'IG', TWITTER: 'X', LINKEDIN: 'LI', TIKTOK: 'TK' };
 
 export default function PostsPage() {
   const [posts, setPosts] = useState([]);
@@ -110,13 +104,21 @@ export default function PostsPage() {
                 {/* Platform icons */}
                 <div className="flex -space-x-1 flex-shrink-0 mt-0.5">
                   {post.accounts?.slice(0, 3).map((pa) => (
-                    <div
-                      key={pa.id}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-white"
-                      style={{ backgroundColor: PLATFORM_BG[pa.socialAccount?.platform] || '#666' }}
-                    >
-                      {PLATFORM_SHORT[pa.socialAccount?.platform] || '?'}
-                    </div>
+                    PLATFORM_LOGOS[pa.socialAccount?.platform] ? (
+                      <img
+                        key={pa.id}
+                        src={PLATFORM_LOGOS[pa.socialAccount?.platform]}
+                        alt={pa.socialAccount?.platform}
+                        className="w-7 h-7 rounded-full border-2 border-white bg-white object-cover"
+                      />
+                    ) : (
+                      <div
+                        key={pa.id}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-white bg-gray-400"
+                      >
+                        ?
+                      </div>
+                    )
                   ))}
                   {post.accounts?.length > 3 && (
                     <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600 border-2 border-white">

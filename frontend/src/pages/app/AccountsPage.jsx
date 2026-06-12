@@ -31,7 +31,14 @@ export default function AccountsPage() {
     const connected = searchParams.get('connected');
     const error = searchParams.get('error');
     if (connected) toast.success(`${connected} connected successfully!`);
-    if (error) toast.error(`Failed to connect: ${error.replace('_', ' ')}`);
+    if (error) {
+      // Map raw OAuth-callback error codes to messages a non-developer can act on.
+      const friendly = {
+        no_instagram_business_account:
+          'No Instagram account is linked to your Facebook Page yet. Open your Page settings (Meta Business Suite → Settings → Linked accounts → Instagram), link your Instagram Business account, then press Connect again.',
+      }[error];
+      toast.error(friendly || `Failed to connect: ${error.replace(/_/g, ' ')}`, { duration: 8000 });
+    }
     // After Facebook OAuth, let the user choose which Page(s) to connect.
     if (searchParams.get('select') === 'facebook') openFacebookPicker();
     fetchAccounts();

@@ -1,6 +1,10 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
+const {
+  exchangeLongLivedToken,
+  findInstagramBusinessAccount,
+} = require('../services/facebook.service');
 
 // Helper to get user from token in query string (passed during OAuth redirect)
 const getUserFromToken = async (token) => {
@@ -264,23 +268,25 @@ router.get('/instagram/callback', async (req, res) => {
     const appSecret = process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET;
     const redirect = process.env.INSTAGRAM_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/instagram/callback`;
 
-    // 1. Exchange code for a user access token
+    // 1. Exchange code for a user access token, then upgrade it to a long-lived
+    //    one — Page tokens derived from a short-lived user token die within the
+    //    hour, which would silently break Instagram publishing later.
     const tokenRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
       params: { client_id: appId, client_secret: appSecret, redirect_uri: redirect, code },
     });
-    const userToken = tokenRes.data.access_token;
+    const userToken = await exchangeLongLivedToken(tokenRes.data.access_token);
 
-    // 2. Find a Page with a linked Instagram business account
-    const pagesRes = await axios.get('https://graph.facebook.com/v18.0/me/accounts', {
-      params: { access_token: userToken, fields: 'id,name,access_token,instagram_business_account' },
-    });
-    const pageWithIg = (pagesRes.data.data || []).find((pg) => pg.instagram_business_account);
-    if (!pageWithIg) {
+    // 2. Find a Page with a linked Instagram business account. /me/accounts is
+    //    EMPTY for Business-portfolio Pages (same root cause as the Facebook
+    //    "No Pages found" bug), so use the shared granular-scopes discovery and
+    //    ask each manageable Page directly.
+    const found = await findInstagramBusinessAccount(userToken);
+    if (!found) {
       return res.redirect(`${FRONTEND}/accounts?error=no_instagram_business_account`);
     }
+    const { page: pageWithIg, igId } = found;
 
     // 3. Fetch the IG business account details (use the Page token going forward)
-    const igId = pageWithIg.instagram_business_account.id;
     const igRes = await axios.get(`https://graph.facebook.com/v18.0/${igId}`, {
       params: { access_token: pageWithIg.access_token, fields: 'id,username,name,profile_picture_url' },
     });

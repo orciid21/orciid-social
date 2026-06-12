@@ -4,6 +4,33 @@ const { AppError } = require('../middleware/error.middleware');
 
 const FB_GRAPH = 'https://graph.facebook.com/v18.0';
 
+// Enumerate every Facebook Page the user can publish to, MERGING two edges:
+//   /me/accounts        — Pages the user personally administers
+//   /me/assigned_pages  — Pages assigned to the user through a Business Manager
+// Why both: with Facebook Login for Business, a Page owned by a Business
+// portfolio (e.g. "HR society" under the "FIT" business) is granted to the app
+// but does NOT appear in /me/accounts — only /me/assigned_pages surfaces it.
+// Relying on /me/accounts alone is what made the picker show "No Pages found".
+// De-duplicates by Page id; each Page carries its own access_token for publishing.
+const fetchManageablePages = async (userToken) => {
+  const fields = 'id,name,category,picture{url},fan_count,access_token';
+  const byId = new Map();
+  const pull = async (edge) => {
+    try {
+      const r = await axios.get(`${FB_GRAPH}/${edge}`, {
+        params: { access_token: userToken, fields, limit: 100 },
+      });
+      for (const pg of r.data.data || []) if (pg && pg.id && !byId.has(pg.id)) byId.set(pg.id, pg);
+    } catch (err) {
+      // A single edge failing (e.g. assigned_pages on accounts without a business)
+      // must not break enumeration — just skip it.
+    }
+  };
+  await pull('me/accounts');
+  await pull('me/assigned_pages');
+  return Array.from(byId.values());
+};
+
 const getAccounts = async (req, res, next) => {
   try {
     const accounts = await prisma.socialAccount.findMany({
@@ -74,13 +101,7 @@ const getFacebookPages = async (req, res, next) => {
       throw new AppError('Facebook is not connected. Please connect Facebook first.', 400);
     }
 
-    const pagesRes = await axios.get(`${FB_GRAPH}/me/accounts`, {
-      params: {
-        access_token: userToken,
-        fields: 'id,name,category,picture{url},fan_count',
-        limit: 100,
-      },
-    });
+    const fbPages = await fetchManageablePages(userToken);
 
     // Mark Pages that are already connected so the UI can show them as added.
     const existing = await prisma.socialAccount.findMany({
@@ -90,7 +111,7 @@ const getFacebookPages = async (req, res, next) => {
     const connectedIds = new Set(existing.map((a) => a.platformId));
 
     // IMPORTANT: never expose Page access tokens to the client.
-    const pages = (pagesRes.data.data || []).map((pg) => ({
+    const pages = fbPages.map((pg) => ({
       id: pg.id,
       name: pg.name,
       category: pg.category,
@@ -124,14 +145,10 @@ const connectFacebookPages = async (req, res, next) => {
     }
 
     // Re-fetch Pages server-side to obtain fresh Page tokens (never trust the client).
-    const pagesRes = await axios.get(`${FB_GRAPH}/me/accounts`, {
-      params: {
-        access_token: userToken,
-        fields: 'id,name,category,picture{url},access_token',
-        limit: 100,
-      },
-    });
-    const chosen = (pagesRes.data.data || []).filter((pg) => pageIds.includes(pg.id));
+    // Same merged enumeration (/me/accounts + /me/assigned_pages) so Business-owned
+    // Pages can be connected, not just personally-administered ones.
+    const fbPages = await fetchManageablePages(userToken);
+    const chosen = fbPages.filter((pg) => pageIds.includes(pg.id));
 
     if (chosen.length === 0) {
       throw new AppError('Selected Pages were not found on your Facebook account', 400);
@@ -215,6 +232,7 @@ const debugFacebook = async (req, res) => {
   out.me = await safe('me', `${FB_GRAPH}/me`, { fields: 'id,name' });
   out.permissions = await safe('permissions', `${FB_GRAPH}/me/permissions`, {});
   out.accounts = await safe('accounts', `${FB_GRAPH}/me/accounts`, { fields: 'id,name,access_token', limit: 100 });
+  out.assignedPages = await safe('assigned_pages', `${FB_GRAPH}/me/assigned_pages`, { fields: 'id,name,access_token,tasks', limit: 100 });
   out.businesses = await safe('businesses', `${FB_GRAPH}/me/businesses`, { fields: 'id,name', limit: 100 });
   out.hrSocietyDirect = await safe('hr_direct', `${FB_GRAPH}/204598046065905`, { fields: 'id,name,access_token' });
 

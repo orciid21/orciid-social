@@ -9,11 +9,13 @@ const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY || 'sbawh3wl4ohgo8jmmg';
 const AUTH_BASE = 'https://www.tiktok.com/v2/auth/authorize/';
 const API_BASE = 'https://open.tiktokapis.com/v2';
 
-// Scopes granted to the Sandbox: profile read + draft upload. video.publish
-// (direct posting) needs App Review, so we upload to the user's TikTok inbox
-// and they tap the notification to finish — exactly how Buffer behaves for
-// not-yet-reviewed TikTok apps.
-const SCOPES = 'user.info.basic,video.upload';
+// Scopes granted to the Sandbox. We request every scope available without App
+// Review: basic profile, profile details (username/bio/verified), engagement
+// stats, draft upload, and reading public videos. The review-gated ones
+// (video.publish/direct-post, user.insights, video.insights, comment.*) are NOT
+// addable until the app passes App Review. Order: basic first so the consent
+// screen leads with the essentials.
+const SCOPES = 'user.info.basic,user.info.profile,user.info.stats,video.upload,video.list';
 
 const buildAuthUrl = ({ redirectUri, state }) => {
   const params = new URLSearchParams({
@@ -58,11 +60,21 @@ const refreshAccessToken = async (refreshToken) => {
 };
 
 const getUserInfo = async (accessToken) => {
-  const res = await axios.get(`${API_BASE}/user/info/`, {
-    params: { fields: 'open_id,union_id,display_name,avatar_url' },
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  return res.data?.data?.user || {};
+  const fetchFields = async (fields) => {
+    const res = await axios.get(`${API_BASE}/user/info/`, {
+      params: { fields },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return res.data?.data?.user || {};
+  };
+  // Prefer the rich field set (needs user.info.profile). A token granted before
+  // that scope was added would 400 on `username` etc. — fall back to basics so
+  // the account still connects.
+  try {
+    return await fetchFields('open_id,union_id,display_name,avatar_url,username,profile_web_link,is_verified');
+  } catch (err) {
+    return await fetchFields('open_id,union_id,display_name,avatar_url').catch(() => ({}));
+  }
 };
 
 // TikTok access tokens live ~24h. A scheduled post may fire after that, so

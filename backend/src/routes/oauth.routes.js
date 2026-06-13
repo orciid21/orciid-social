@@ -358,8 +358,8 @@ router.get('/tiktok/callback', async (req, res) => {
     const profile = await tiktokService.getUserInfo(tk.access_token).catch(() => ({}));
     await saveSocialAccount(user.id, 'TIKTOK', {
       platformId: tk.open_id,
-      name: profile.display_name || 'TikTok',
-      username: profile.display_name,
+      name: profile.display_name || profile.username || 'TikTok',
+      username: profile.username || profile.display_name,
       avatar: profile.avatar_url,
       accessToken: tk.access_token,
       refreshToken: tk.refresh_token,

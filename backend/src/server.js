@@ -160,10 +160,13 @@ const withTimeout = (promise, ms, label) =>
     new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms)),
   ]);
 
-// Matches Prisma's dead-engine state only — connectivity blips (MySQL restart,
-// network) must NOT kill the process; they recover in place once the DB is back.
-const ENGINE_PANIC_RE = /timer has gone away|PANIC/i;
-
+// NEVER exit the process here. We tried process.exit() on panic to force a
+// fresh process — it caused a crash loop: every fresh boot re-panicked, the
+// platform supervisor hit backoff, and the whole site went hard-down (000) for
+// minutes. Instead keep the process ALIVE and listening; recycle the Prisma
+// engine with $disconnect (the next query spawns a new engine) and retry
+// forever. Static pages + non-DB routes keep serving, and DB calls recover
+// in-place the moment MySQL is reachable again — no downtime, no crash loop.
 const verifyDatabaseInBackground = async () => {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -176,13 +179,6 @@ const verifyDatabaseInBackground = async () => {
       write('Database check failed (attempt ' + attempt + '): ' + msg.slice(0, 160));
       // Recycle the engine: $disconnect discards it, the next query spawns a new one.
       try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
-      if (ENGINE_PANIC_RE.test(msg) && attempt >= 2) {
-        // The panicked engine never recovers inside this process — the only
-        // observed cure is a brand-new process, which the platform spawns on
-        // the next request after we exit.
-        write('Engine panic is unrecoverable in-process — exiting so a fresh process is spawned');
-        process.exit(1);
-      }
       await new Promise((r) => setTimeout(r, attempt >= 5 ? 15000 : 2000));
     }
   }

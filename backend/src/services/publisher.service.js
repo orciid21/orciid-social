@@ -1,5 +1,6 @@
 const axios = require('axios');
 const prisma = require('../config/prisma');
+const tiktokService = require('./tiktok.service');
 
 const publishers = {
   FACEBOOK: async (account, post) => {
@@ -100,8 +101,17 @@ const publishers = {
   },
 
   TIKTOK: async (account, post) => {
-    // TikTok Content Posting API
-    throw new Error('TikTok publishing coming soon');
+    // TikTok Content Posting API. We have the video.upload scope (not
+    // video.publish, which needs App Review), so the video is sent to the
+    // creator's TikTok inbox as a draft — they tap the notification to finish.
+    const media = Array.isArray(post.mediaUrls) ? post.mediaUrls.filter(Boolean) : [];
+    const videoUrl = media.find((u) => /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(u));
+    if (!videoUrl) {
+      throw new Error('TikTok requires a video file to publish.');
+    }
+    const token = await tiktokService.ensureFreshToken(account);
+    const publishId = await tiktokService.uploadVideoDraft(token, videoUrl);
+    return publishId;
   },
 };
 

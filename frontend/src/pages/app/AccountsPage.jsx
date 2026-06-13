@@ -10,7 +10,7 @@ const PLATFORMS = [
   { id: 'INSTAGRAM', name: 'Instagram', desc: 'Business & creator accounts' },
   { id: 'TWITTER', name: 'Twitter / X', desc: 'Posts, replies & threads' },
   { id: 'LINKEDIN', name: 'LinkedIn', desc: 'Personal profiles & pages' },
-  { id: 'TIKTOK', name: 'TikTok', desc: 'Video posts (coming soon)' },
+  { id: 'TIKTOK', name: 'TikTok', desc: 'Video posts & Reels' },
 ];
 
 export default function AccountsPage() {
@@ -39,6 +39,10 @@ export default function AccountsPage() {
       const friendly = {
         no_instagram_business_account:
           'No Instagram account is linked to your Facebook Page yet. Open your Page settings (Meta Business Suite → Settings → Linked accounts → Instagram), link your Instagram Business account, then press Connect again.',
+        tiktok_not_configured:
+          'TikTok isn\'t fully set up yet (missing API secret). Please try again shortly.',
+        tiktok_failed:
+          'TikTok connection failed. Make sure this TikTok account is added as a Target User in the app Sandbox, then try again.',
       }[error];
       toast.error(friendly || `Failed to connect: ${error.replace(/_/g, ' ')}`, { duration: 8000 });
     }
@@ -124,10 +128,6 @@ export default function AccountsPage() {
   };
 
   const handleConnect = (platformId) => {
-    if (platformId === 'TIKTOK') {
-      toast('TikTok integration coming soon!', { icon: '🚧' });
-      return;
-    }
     // Buffer-style explainer first: Instagram needs a Professional account,
     // and the user should know what they're choosing before the OAuth screen.
     if (platformId === 'INSTAGRAM') {

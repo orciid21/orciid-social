@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
+const tiktokService = require('../services/tiktok.service');
 
 // Helper to get user from token in query string (passed during OAuth redirect)
 const getUserFromToken = async (token) => {
@@ -318,6 +319,57 @@ router.get('/instagram/callback', async (req, res) => {
   } catch (err) {
     console.error('Instagram OAuth error:', err.response?.data || err.message);
     res.redirect(`${FRONTEND}/accounts?error=instagram_failed`);
+  }
+});
+
+// --- TikTok (Login Kit + Content Posting API, v2) ---
+// Runs against the app Sandbox until App Review passes. The connecting account
+// must be a Sandbox Target User. Tokens live on open.tiktokapis.com.
+router.get('/tiktok', (req, res) => {
+  const { token } = req.query;
+  const state = Buffer.from(JSON.stringify({ token })).toString('base64');
+  const redirect = callbackUrl('tiktok', 'TIKTOK_CALLBACK_URL');
+  res.redirect(tiktokService.buildAuthUrl({ redirectUri: redirect, state }));
+});
+
+router.get('/tiktok/callback', async (req, res) => {
+  try {
+    const { code, state, error: oauthError } = req.query;
+    if (oauthError || !code) {
+      console.error('TikTok auth denied/failed:', oauthError || 'no code');
+      return res.redirect(`${FRONTEND}/accounts?error=tiktok_failed`);
+    }
+    const { token } = JSON.parse(Buffer.from(state, 'base64').toString());
+    const user = await getUserFromToken(token);
+    if (!user) return res.redirect(`${FRONTEND}/accounts?error=auth_failed`);
+
+    if (!process.env.TIKTOK_CLIENT_SECRET) {
+      console.error('TIKTOK_CLIENT_SECRET is not set — add it in Hostinger env vars');
+      return res.redirect(`${FRONTEND}/accounts?error=tiktok_not_configured`);
+    }
+
+    const redirect = callbackUrl('tiktok', 'TIKTOK_CALLBACK_URL');
+    const tk = await tiktokService.exchangeCodeForToken(code, redirect);
+    if (!tk.access_token) {
+      console.error('TikTok token exchange failed:', tk);
+      return res.redirect(`${FRONTEND}/accounts?error=tiktok_failed`);
+    }
+
+    const profile = await tiktokService.getUserInfo(tk.access_token).catch(() => ({}));
+    await saveSocialAccount(user.id, 'TIKTOK', {
+      platformId: tk.open_id,
+      name: profile.display_name || 'TikTok',
+      username: profile.display_name,
+      avatar: profile.avatar_url,
+      accessToken: tk.access_token,
+      refreshToken: tk.refresh_token,
+      tokenExpiry: tk.expires_in ? new Date(Date.now() + tk.expires_in * 1000) : undefined,
+    });
+
+    res.redirect(`${FRONTEND}/accounts?connected=tiktok`);
+  } catch (err) {
+    console.error('TikTok OAuth error:', err.response?.data || err.message);
+    res.redirect(`${FRONTEND}/accounts?error=tiktok_failed`);
   }
 });
 

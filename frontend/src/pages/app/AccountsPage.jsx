@@ -47,6 +47,10 @@ export default function AccountsPage() {
           'LinkedIn isn\'t fully set up yet (missing API credentials). Please try again shortly.',
         linkedin_failed:
           'LinkedIn connection failed. Please try connecting again. If it keeps failing, the LinkedIn app may need re-approval.',
+        twitter_not_configured:
+          'X (Twitter) isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+        twitter_failed:
+          'X (Twitter) connection failed. Please try connecting again.',
       }[error];
       toast.error(friendly || `Failed to connect: ${error.replace(/_/g, ' ')}`, { duration: 8000 });
     }

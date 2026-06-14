@@ -1,6 +1,7 @@
 const axios = require('axios');
 const prisma = require('../config/prisma');
 const tiktokService = require('./tiktok.service');
+const twitterService = require('./twitter.service');
 
 const publishers = {
   FACEBOOK: async (account, post) => {
@@ -36,10 +37,13 @@ const publishers = {
   },
 
   TWITTER: async (account, post) => {
+    // X access tokens expire ~2h; refresh against the stored refresh token so
+    // scheduled posts that fire later don't fail with an expired token.
+    const token = await twitterService.ensureFreshToken(account);
     const res = await axios.post(
       'https://api.twitter.com/2/tweets',
       { text: post.content.slice(0, 280) },
-      { headers: { Authorization: `Bearer ${account.accessToken}` } }
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
     );
     return res.data.data.id;
   },

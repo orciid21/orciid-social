@@ -149,6 +149,11 @@ router.get('/twitter/callback', async (req, res) => {
     const user = await getUserFromToken(token);
     if (!user) return res.redirect(`${FRONTEND}/accounts?error=auth_failed`);
 
+    if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_API_SECRET) {
+      console.error('TWITTER_API_KEY/SECRET not set — add them in Hostinger env vars');
+      return res.redirect(`${FRONTEND}/accounts?error=twitter_not_configured`);
+    }
+
     const axios = require('axios').default;
     const credentials = Buffer.from(`${process.env.TWITTER_API_KEY}:${process.env.TWITTER_API_SECRET}`).toString('base64');
 
@@ -162,7 +167,7 @@ router.get('/twitter/callback', async (req, res) => {
       { headers: { Authorization: `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
-    const { access_token, refresh_token } = tokenRes.data;
+    const { access_token, refresh_token, expires_in } = tokenRes.data;
     const profileRes = await axios.get('https://api.twitter.com/2/users/me', {
       params: { 'user.fields': 'name,username,profile_image_url' },
       headers: { Authorization: `Bearer ${access_token}` },
@@ -176,6 +181,7 @@ router.get('/twitter/callback', async (req, res) => {
       avatar: profile.profile_image_url,
       accessToken: access_token,
       refreshToken: refresh_token,
+      tokenExpiry: expires_in ? new Date(Date.now() + expires_in * 1000) : null,
     });
 
     res.redirect(`${FRONTEND}/accounts?connected=twitter`);

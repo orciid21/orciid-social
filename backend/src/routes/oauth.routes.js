@@ -138,7 +138,10 @@ router.get('/twitter', (req, res) => {
   // Twitter OAuth 2.0 PKCE
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = callbackUrl('twitter', 'TWITTER_CALLBACK_URL');
-  const twitterUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_API_KEY}&redirect_uri=${encodeURIComponent(redirect)}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`;
+  // Use x.com (not the legacy twitter.com) for the authorize step — X migrated
+  // to x.com and a user logged in on x.com isn't recognized by twitter.com's
+  // OAuth page, which forces a re-login loop. x.com sees the existing session.
+  const twitterUrl = `https://x.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_API_KEY}&redirect_uri=${encodeURIComponent(redirect)}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`;
   res.redirect(twitterUrl);
 });
 

@@ -205,6 +205,11 @@ router.get('/linkedin/callback', async (req, res) => {
     const user = await getUserFromToken(token);
     if (!user) return res.redirect(`${FRONTEND}/accounts?error=auth_failed`);
 
+    if (!process.env.LINKEDIN_CLIENT_ID || !process.env.LINKEDIN_CLIENT_SECRET) {
+      console.error('LINKEDIN_CLIENT_ID/SECRET not set — add them in Hostinger env vars');
+      return res.redirect(`${FRONTEND}/accounts?error=linkedin_not_configured`);
+    }
+
     const axios = require('axios').default;
     const tokenRes = await axios.post('https://www.linkedin.com/oauth/v2/accessToken',
       new URLSearchParams({

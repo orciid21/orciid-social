@@ -9,7 +9,7 @@ const PLATFORMS = [
   { id: 'FACEBOOK', name: 'Facebook', desc: 'Publish to your Facebook Pages' },
   { id: 'INSTAGRAM', name: 'Instagram', desc: 'Business & creator accounts' },
   { id: 'TWITTER', name: 'Twitter / X', desc: 'Posts, replies & threads' },
-  { id: 'LINKEDIN', name: 'LinkedIn', desc: 'Personal profiles & pages' },
+  { id: 'LINKEDIN', name: 'LinkedIn', desc: 'Personal profile' },
   { id: 'TIKTOK', name: 'TikTok', desc: 'Video posts & Reels' },
 ];
 
@@ -43,6 +43,10 @@ export default function AccountsPage() {
           'TikTok isn\'t fully set up yet (missing API secret). Please try again shortly.',
         tiktok_failed:
           'TikTok connection failed. Make sure this TikTok account is added as a Target User in the app Sandbox, then try again.',
+        linkedin_not_configured:
+          'LinkedIn isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+        linkedin_failed:
+          'LinkedIn connection failed. Please try connecting again. If it keeps failing, the LinkedIn app may need re-approval.',
       }[error];
       toast.error(friendly || `Failed to connect: ${error.replace(/_/g, ' ')}`, { duration: 8000 });
     }

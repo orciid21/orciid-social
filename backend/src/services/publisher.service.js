@@ -58,9 +58,17 @@ const publishers = {
         },
         visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
       },
-      { headers: { Authorization: `Bearer ${account.accessToken}` } }
+      {
+        headers: {
+          Authorization: `Bearer ${account.accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'Content-Type': 'application/json',
+        },
+      }
     );
-    return res.data.id;
+    // LinkedIn returns the created post's URN in the x-restli-id response
+    // HEADER, not the JSON body — read it there (fall back defensively).
+    return res.headers['x-restli-id'] || res.headers['x-linkedin-id'] || res.data.id;
   },
 
   INSTAGRAM: async (account, post) => {

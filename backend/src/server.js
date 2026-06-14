@@ -107,24 +107,13 @@ const startServer = () => {
     console.log(`🚀 Orciid Social API running on port ${PORT}`);
     console.log(`   Environment: ${process.env.NODE_ENV}`);
 
-    // Best-effort: also try the prisma CLI db push, in case it ever IS available.
-    // Harmless when it isn't — ensureColumns() already added what we need.
-    console.log('Running prisma db push in background...');
-    exec(
-      process.execPath + ' node_modules/.bin/prisma db push --accept-data-loss',
-      { cwd: __dirname + '/..', timeout: 120000 },
-      (err, stdout, stderr) => {
-        if (err) {
-          write('Prisma db push failed: ' + err.message);
-          if (stderr) write('Prisma stderr: ' + stderr);
-          if (stdout) write('Prisma stdout: ' + stdout);
-        } else {
-          write('Prisma db push completed');
-          if (stdout) console.log(stdout);
-        }
-        initScheduler();
-      }
-    );
+    // Start the scheduler directly. (Removed the boot-time `prisma db push`: it
+    // spawned a SECOND Prisma engine on every restart, and under host resource
+    // pressure that boot-time contention coincided with the main engine's first
+    // query — a likely trigger for the "timer has gone away" engine panic that
+    // wedged the DB. ensureColumns() already applies the needed schema changes
+    // via the always-installed @prisma/client, so db push is redundant.)
+    initScheduler();
   });
 
   server.on('error', (err) => {

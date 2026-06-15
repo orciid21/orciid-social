@@ -11,6 +11,7 @@ const PLATFORMS = [
   { id: 'TWITTER', name: 'Twitter / X', desc: 'Posts, replies & threads' },
   { id: 'LINKEDIN', name: 'LinkedIn', desc: 'Personal profile' },
   { id: 'TIKTOK', name: 'TikTok', desc: 'Video posts & Reels' },
+  { id: 'THREADS', name: 'Threads', desc: 'Text, photo & video posts' },
 ];
 
 export default function AccountsPage() {
@@ -51,6 +52,10 @@ export default function AccountsPage() {
           'X (Twitter) isn\'t fully set up yet (missing API credentials). Please try again shortly.',
         twitter_failed:
           'X (Twitter) connection failed. Please try connecting again.',
+        threads_not_configured:
+          'Threads isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+        threads_failed:
+          'Threads connection failed. Make sure your Threads account has accepted the app\'s tester invite (Threads → Settings → Website permissions → Invites), then try again.',
       }[error];
       toast.error(friendly || `Failed to connect: ${error.replace(/_/g, ' ')}`, { duration: 8000 });
     }

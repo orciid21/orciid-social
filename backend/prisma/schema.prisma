@@ -172,6 +172,7 @@ enum Platform {
   TWITTER
   LINKEDIN
   TIKTOK
+  THREADS
   YOUTUBE
   PINTEREST
 }

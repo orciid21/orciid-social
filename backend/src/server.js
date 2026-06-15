@@ -100,6 +100,38 @@ const ensureColumns = async () => {
   }
 };
 
+// Keep the SocialAccount.platform MySQL ENUM in sync with the Prisma Platform
+// enum. Prisma maps the enum to a native MySQL ENUM column, and (since boot-time
+// `prisma db push` was removed) adding a new enum value in schema.prisma does NOT
+// reach the DB — inserting it then fails with "Data truncated for column platform".
+// This reads the current column type and adds any missing value via a single
+// idempotent ALTER, preserving the existing values + nullability.
+const REQUIRED_PLATFORMS = ['FACEBOOK', 'INSTAGRAM', 'TWITTER', 'LINKEDIN', 'TIKTOK', 'THREADS', 'YOUTUBE', 'PINTEREST'];
+const ensurePlatformEnum = async () => {
+  try {
+    const rows = await prismaClient.$queryRawUnsafe(
+      "SELECT COLUMN_TYPE AS t, IS_NULLABLE AS n FROM INFORMATION_SCHEMA.COLUMNS " +
+      "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'SocialAccount' AND COLUMN_NAME = 'platform'"
+    );
+    const row = Array.isArray(rows) && rows[0];
+    if (!row) return;
+    const colType = String(row.t || '');
+    const missing = REQUIRED_PLATFORMS.filter((p) => !colType.includes(`'${p}'`));
+    if (missing.length === 0) {
+      write('Platform enum already up to date');
+      return;
+    }
+    const nullable = String(row.n).toUpperCase() === 'YES' ? 'NULL' : 'NOT NULL';
+    const newType = "enum(" + REQUIRED_PLATFORMS.map((p) => `'${p}'`).join(',') + ")";
+    await prismaClient.$executeRawUnsafe(
+      "ALTER TABLE `SocialAccount` MODIFY `platform` " + newType + " " + nullable
+    );
+    write('Platform enum: added ' + missing.join(','));
+  } catch (err) {
+    write('ensurePlatformEnum error: ' + (err.message || err));
+  }
+};
+
 const startServer = () => {
   write('Starting server on port: ' + PORT);
   server = app.listen(PORT, () => {
@@ -178,7 +210,7 @@ const verifyDatabaseInBackground = async () => {
 // startServer(). They all run in the background right after.
 write('Starting server immediately; DB verification runs in background...');
 startServer();
-verifyDatabaseInBackground().then(ensureColumns).then(fixupFacebookAvatars);
+verifyDatabaseInBackground().then(ensureColumns).then(ensurePlatformEnum).then(fixupFacebookAvatars);
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');

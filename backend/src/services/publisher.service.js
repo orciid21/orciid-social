@@ -112,6 +112,49 @@ const publishers = {
     return publishRes.data.id;
   },
 
+  THREADS: async (account, post) => {
+    // Meta Threads API — 2-step container + publish (mirrors Instagram) but on
+    // graph.threads.net, and TEXT-only posts are allowed (no media required).
+    const BASE = `https://graph.threads.net/v1.0/${account.platformId}`;
+    const media = Array.isArray(post.mediaUrls) ? post.mediaUrls.filter(Boolean) : [];
+    const url = media[0];
+    const isVideo = url && /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(url);
+
+    // 1. Create the media container (params as query — Meta Graph accepts this).
+    const params = { access_token: account.accessToken, text: post.content };
+    if (!url) {
+      params.media_type = 'TEXT';
+    } else if (isVideo) {
+      params.media_type = 'VIDEO';
+      params.video_url = url;
+    } else {
+      params.media_type = 'IMAGE';
+      params.image_url = url;
+    }
+    const containerRes = await axios.post(`${BASE}/threads`, null, { params });
+    const creationId = containerRes.data.id;
+
+    // 2. Image/video containers process asynchronously — wait until FINISHED.
+    if (url) {
+      for (let i = 0; i < 30; i++) {
+        const st = await axios.get(`https://graph.threads.net/v1.0/${creationId}`, {
+          params: { fields: 'status', access_token: account.accessToken },
+        });
+        if (st.data.status === 'FINISHED') break;
+        if (st.data.status === 'ERROR' || st.data.status === 'EXPIRED') {
+          throw new Error(`Threads could not process the media (${st.data.status})`);
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+
+    // 3. Publish the container.
+    const pubRes = await axios.post(`${BASE}/threads_publish`, null, {
+      params: { creation_id: creationId, access_token: account.accessToken },
+    });
+    return pubRes.data.id;
+  },
+
   TIKTOK: async (account, post) => {
     // TikTok Content Posting API. We have the video.upload scope (not
     // video.publish, which needs App Review), so the video is sent to the

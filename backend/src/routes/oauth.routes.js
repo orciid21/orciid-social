@@ -336,6 +336,87 @@ router.get('/instagram/callback', async (req, res) => {
   }
 });
 
+// --- Threads (Meta Threads API — Buffer-style direct flow, mirrors Instagram) ---
+// Threads has its OWN App ID/Secret (distinct from the Facebook/Instagram app),
+// configured under the Meta app's "Access the Threads API" use case. All calls go
+// to threads.net (authorize) / graph.threads.net (token + Graph), NOT
+// graph.facebook.com. Tokens: short-lived (1h) -> long-lived (60d) via th_exchange_token.
+const THREADS_GRAPH = 'https://graph.threads.net';
+
+router.get('/threads', (req, res) => {
+  const { token } = req.query;
+  const state = Buffer.from(JSON.stringify({ token })).toString('base64');
+  const redirect = process.env.THREADS_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/threads/callback`;
+  const scope = 'threads_basic,threads_content_publish';
+  const url = `https://threads.net/oauth/authorize?client_id=${process.env.THREADS_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
+  res.redirect(url);
+});
+
+router.get('/threads/callback', async (req, res) => {
+  try {
+    let { code } = req.query;
+    const { state, error_description: errDesc } = req.query;
+    if (!code) {
+      console.error('Threads login denied/failed:', errDesc || req.query.error || 'no code');
+      return res.redirect(`${FRONTEND}/accounts?error=threads_failed`);
+    }
+    // Meta appends a trailing "#_" to the auth code — strip it before exchange.
+    code = String(code).replace(/#_$/, '');
+    const { token } = JSON.parse(Buffer.from(state, 'base64').toString());
+    const user = await getUserFromToken(token);
+    if (!user) return res.redirect(`${FRONTEND}/accounts?error=auth_failed`);
+
+    const appSecret = process.env.THREADS_APP_SECRET;
+    if (!process.env.THREADS_APP_ID || !appSecret) {
+      console.error('THREADS_APP_ID/SECRET not set — add them in Hostinger env vars');
+      return res.redirect(`${FRONTEND}/accounts?error=threads_not_configured`);
+    }
+    const axios = require('axios').default;
+    const redirect = process.env.THREADS_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/threads/callback`;
+
+    // 1. Exchange the code for a short-lived Threads token (graph.threads.net).
+    const tokenRes = await axios.post(
+      `${THREADS_GRAPH}/oauth/access_token`,
+      new URLSearchParams({
+        client_id: process.env.THREADS_APP_ID,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: redirect,
+        code,
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    const shortToken = tokenRes.data.access_token;
+
+    // 2. Upgrade to a long-lived (~60 day) token via the Threads-specific grant.
+    const llRes = await axios.get(`${THREADS_GRAPH}/access_token`, {
+      params: { grant_type: 'th_exchange_token', client_secret: appSecret, access_token: shortToken },
+    });
+    const accessToken = llRes.data.access_token || shortToken;
+    const expiresIn = llRes.data.expires_in;
+
+    // 3. Fetch the Threads profile (id is the path param for all publish calls).
+    const meRes = await axios.get(`${THREADS_GRAPH}/v1.0/me`, {
+      params: { fields: 'id,username,threads_profile_picture_url', access_token: accessToken },
+    });
+    const me = meRes.data;
+
+    await saveSocialAccount(user.id, 'THREADS', {
+      platformId: String(me.id || tokenRes.data.user_id),
+      name: me.username,
+      username: me.username,
+      avatar: me.threads_profile_picture_url,
+      accessToken,
+      tokenExpiry: expiresIn ? new Date(Date.now() + expiresIn * 1000) : undefined,
+    });
+
+    res.redirect(`${FRONTEND}/accounts?connected=threads`);
+  } catch (err) {
+    console.error('Threads OAuth error:', err.response?.data || err.message);
+    res.redirect(`${FRONTEND}/accounts?error=threads_failed`);
+  }
+});
+
 // --- TikTok (Login Kit + Content Posting API, v2) ---
 // Runs against the app Sandbox until App Review passes. The connecting account
 // must be a Sandbox Target User. Tokens live on open.tiktokapis.com.

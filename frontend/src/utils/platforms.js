@@ -3,6 +3,7 @@ import instagram from '../assets/platforms/instagram.png';
 import twitter from '../assets/platforms/twitter.png';
 import linkedin from '../assets/platforms/linkedin.png';
 import tiktok from '../assets/platforms/tiktok.png';
+import threads from '../assets/platforms/threads.png';
 
 // Single source of truth for platform branding. The PNGs are the client's own
 // logo set (src/assets/platforms/) — use these everywhere instead of ad-hoc
@@ -13,6 +14,7 @@ export const PLATFORM_LOGOS = {
   TWITTER: twitter,
   LINKEDIN: linkedin,
   TIKTOK: tiktok,
+  THREADS: threads,
 };
 
 export const PLATFORM_META = {
@@ -21,4 +23,5 @@ export const PLATFORM_META = {
   TWITTER: { label: 'Twitter/X', bg: '#000000', logo: twitter },
   LINKEDIN: { label: 'LinkedIn', bg: '#0A66C2', logo: linkedin },
   TIKTOK: { label: 'TikTok', bg: '#000000', logo: tiktok },
+  THREADS: { label: 'Threads', bg: '#000000', logo: threads },
 };

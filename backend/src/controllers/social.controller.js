@@ -66,6 +66,7 @@ const getConnectUrl = (req, res) => {
     TIKTOK: `${baseUrl}/auth/tiktok?token=${token}`,
     INSTAGRAM: `${baseUrl}/auth/instagram?token=${token}`,
     THREADS: `${baseUrl}/auth/threads?token=${token}`,
+    YOUTUBE: `${baseUrl}/auth/youtube?token=${token}`,
   };
 
   const url = urls[platform.toUpperCase()];

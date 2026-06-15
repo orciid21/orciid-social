@@ -2,6 +2,7 @@ const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
 const tiktokService = require('../services/tiktok.service');
+const youtubeService = require('../services/youtube.service');
 
 // Helper to get user from token in query string (passed during OAuth redirect)
 const getUserFromToken = async (token) => {
@@ -465,6 +466,57 @@ router.get('/tiktok/callback', async (req, res) => {
   } catch (err) {
     console.error('TikTok OAuth error:', err.response?.data || err.message);
     res.redirect(`${FRONTEND}/accounts?error=tiktok_failed`);
+  }
+});
+
+// --- YouTube (Google OAuth 2.0 + YouTube Data API v3) ---
+// Connect = Google sign-in (youtube.upload + youtube.readonly); publish = video
+// upload. Tokens come from Google and refresh against a long-lived refresh_token.
+router.get('/youtube', (req, res) => {
+  const { token } = req.query;
+  const state = Buffer.from(JSON.stringify({ token })).toString('base64');
+  const redirect = callbackUrl('youtube', 'YOUTUBE_CALLBACK_URL');
+  res.redirect(youtubeService.buildAuthUrl({ redirectUri: redirect, state }));
+});
+
+router.get('/youtube/callback', async (req, res) => {
+  try {
+    const { code, state, error: oauthError } = req.query;
+    if (oauthError || !code) {
+      console.error('YouTube auth denied/failed:', oauthError || 'no code');
+      return res.redirect(`${FRONTEND}/accounts?error=youtube_failed`);
+    }
+    const { token } = JSON.parse(Buffer.from(state, 'base64').toString());
+    const user = await getUserFromToken(token);
+    if (!user) return res.redirect(`${FRONTEND}/accounts?error=auth_failed`);
+
+    if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
+      console.error('YOUTUBE_CLIENT_ID/SECRET not set — add them in Hostinger env vars');
+      return res.redirect(`${FRONTEND}/accounts?error=youtube_not_configured`);
+    }
+
+    const redirect = callbackUrl('youtube', 'YOUTUBE_CALLBACK_URL');
+    const tk = await youtubeService.exchangeCodeForToken(code, redirect);
+    if (!tk.access_token) {
+      console.error('YouTube token exchange failed:', tk);
+      return res.redirect(`${FRONTEND}/accounts?error=youtube_failed`);
+    }
+
+    const channel = await youtubeService.getChannelInfo(tk.access_token).catch(() => ({}));
+    await saveSocialAccount(user.id, 'YOUTUBE', {
+      platformId: channel.id || user.id,
+      name: channel.title || 'YouTube',
+      username: channel.title,
+      avatar: channel.avatar,
+      accessToken: tk.access_token,
+      refreshToken: tk.refresh_token,
+      tokenExpiry: tk.expires_in ? new Date(Date.now() + tk.expires_in * 1000) : undefined,
+    });
+
+    res.redirect(`${FRONTEND}/accounts?connected=youtube`);
+  } catch (err) {
+    console.error('YouTube OAuth error:', err.response?.data || err.message);
+    res.redirect(`${FRONTEND}/accounts?error=youtube_failed`);
   }
 });
 

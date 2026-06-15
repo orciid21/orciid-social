@@ -2,6 +2,7 @@ const axios = require('axios');
 const prisma = require('../config/prisma');
 const tiktokService = require('./tiktok.service');
 const twitterService = require('./twitter.service');
+const youtubeService = require('./youtube.service');
 
 const publishers = {
   FACEBOOK: async (account, post) => {
@@ -167,6 +168,21 @@ const publishers = {
     const token = await tiktokService.ensureFreshToken(account);
     const publishId = await tiktokService.uploadVideoDraft(token, videoUrl);
     return publishId;
+  },
+
+  YOUTUBE: async (account, post) => {
+    // YouTube Data API v3 — a video upload. Like TikTok, this requires a video
+    // file; YouTube is not a text platform. The post content becomes the video
+    // title (first line) + description. Until the Google project passes the
+    // YouTube API audit, the video lands as PRIVATE regardless of privacyStatus.
+    const media = Array.isArray(post.mediaUrls) ? post.mediaUrls.filter(Boolean) : [];
+    const videoUrl = media.find((u) => /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(u));
+    if (!videoUrl) {
+      throw new Error('YouTube requires a video file to publish.');
+    }
+    const token = await youtubeService.ensureFreshToken(account);
+    const videoId = await youtubeService.uploadVideo(token, videoUrl, post.content);
+    return videoId;
   },
 };
 

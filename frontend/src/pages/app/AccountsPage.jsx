@@ -12,6 +12,7 @@ const PLATFORMS = [
   { id: 'LINKEDIN', name: 'LinkedIn', desc: 'Personal profile' },
   { id: 'TIKTOK', name: 'TikTok', desc: 'Video posts & Reels' },
   { id: 'THREADS', name: 'Threads', desc: 'Text, photo & video posts' },
+  { id: 'YOUTUBE', name: 'YouTube', desc: 'Upload videos to your channel' },
 ];
 
 export default function AccountsPage() {
@@ -56,6 +57,10 @@ export default function AccountsPage() {
           'Threads isn\'t fully set up yet (missing API credentials). Please try again shortly.',
         threads_failed:
           'Threads connection failed. Make sure your Threads account has accepted the app\'s tester invite (Threads → Settings → Website permissions → Invites), then try again.',
+        youtube_not_configured:
+          'YouTube isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+        youtube_failed:
+          'YouTube connection failed. Make sure your Google account is added as a Test user on the app\'s OAuth consent screen, then try again.',
       }[error];
       toast.error(friendly || `Failed to connect: ${error.replace(/_/g, ' ')}`, { duration: 8000 });
     }

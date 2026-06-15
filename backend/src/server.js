@@ -212,6 +212,23 @@ write('Starting server immediately; DB verification runs in background...');
 startServer();
 verifyDatabaseInBackground().then(ensureColumns).then(ensurePlatformEnum).then(fixupFacebookAvatars);
 
+// Perpetual DB health monitor. verifyDatabaseInBackground() above only runs ONCE
+// (it resolves on the first healthy SELECT 1). The boot chain then runs raw-query
+// migration steps (ensureColumns / ensurePlatformEnum / fixupFacebookAvatars) — if
+// any of those, or a runtime query, panics the engine ("timer has gone away"),
+// nothing was recycling it and the whole site stayed 500 forever (only a manual
+// restart fixed it). This probes SELECT 1 every 20s and, on failure, recycles the
+// engine via $disconnect (the next query spawns a fresh one), so ANY panic — boot
+// or runtime — recovers in-place within ~20s instead of wedging the site.
+setInterval(async () => {
+  try {
+    await withTimeout(prismaClient.$queryRawUnsafe('SELECT 1'), 8000, 'db monitor');
+  } catch (err) {
+    write('DB monitor: probe failed, recycling engine — ' + String(err.message || err).slice(0, 120));
+    try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
+  }
+}, 20000);
+
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   if (server) {

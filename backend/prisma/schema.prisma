@@ -1,5 +1,13 @@
 generator client {
   provider = "prisma-client-js"
+  // Use the BINARY query engine (separate subprocess) instead of the default
+  // "library" (Node-API) engine. The library engine runs inside the Node
+  // process and, under Hostinger's shared-host resource pressure, repeatedly
+  // panicked with "PANIC: timer has gone away" (a libuv/Tokio timer starvation
+  // bug) on the first query of fresh boots — wedging every DB route at 500 with
+  // no in-process recovery. The binary engine isolates the query engine in its
+  // own process with its own runtime, which is immune to that timer panic.
+  engineType = "binary"
 }
 
 datasource db {

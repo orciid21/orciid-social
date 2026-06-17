@@ -51,9 +51,28 @@ model Workspace {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  members  WorkspaceMember[]
-  accounts SocialAccount[]
-  posts    Post[]
+  members     WorkspaceMember[]
+  accounts    SocialAccount[]
+  posts       Post[]
+  invitations Invitation[]
+}
+
+// Pending team invitations. When the invited email belongs to an existing user
+// we add them straight to WorkspaceMember; otherwise we keep a PENDING row here
+// and convert it to a membership when that email registers (see auth register).
+model Invitation {
+  id          String    @id @default(uuid())
+  workspaceId String
+  email       String
+  role        WsRole    @default(MEMBER)
+  token       String    @unique @default(uuid())
+  status      String    @default("PENDING")
+  invitedBy   String?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
 }
 
 model WorkspaceMember {

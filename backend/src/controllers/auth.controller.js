@@ -53,6 +53,24 @@ const register = async (req, res, next) => {
       },
     });
 
+    // Convert any pending team invitations for this email into memberships, so
+    // an invited person automatically joins the inviter's workspace on sign-up.
+    try {
+      const invites = await prisma.invitation.findMany({
+        where: { email: email.toLowerCase(), status: 'PENDING' },
+      });
+      for (const inv of invites) {
+        await prisma.workspaceMember.upsert({
+          where: { userId_workspaceId: { userId: user.id, workspaceId: inv.workspaceId } },
+          update: {},
+          create: { userId: user.id, workspaceId: inv.workspaceId, role: inv.role },
+        });
+        await prisma.invitation.update({ where: { id: inv.id }, data: { status: 'ACCEPTED' } });
+      }
+    } catch (inviteErr) {
+      console.warn('Invitation conversion failed (non-fatal):', inviteErr.message);
+    }
+
     // Send verification email — non-fatal if SMTP not configured
     try {
       await emailService.sendVerificationEmail(email, name, verifyToken);

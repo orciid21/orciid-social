@@ -411,15 +411,25 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
             </div>
           </div>
 
-          {/* RIGHT: preview */}
-          <div className="hidden lg:flex flex-col overflow-y-auto bg-gray-50 border-l border-gray-100 p-5 gap-3">
-            <p className="text-sm font-semibold text-gray-700">Post Previews</p>
+          {/* RIGHT: preview — header stays fixed, the cards get their OWN
+              internal scroll and are laid out two-per-row (Buffer/Meta style). */}
+          <div className="hidden lg:flex flex-col overflow-hidden bg-gray-50 border-l border-gray-100">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+              <p className="text-sm font-semibold text-gray-700">Post Previews</p>
+              {selected.length > 0 && (
+                <span className="text-xs text-gray-400">{selected.length} channel{selected.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
             {selected.length === 0 ? (
               <div className="text-sm text-gray-400 text-center py-10">Select a channel to see a preview</div>
             ) : (
-              selected.map((acc) => (
-                <PreviewCard key={acc.id} account={acc} content={content} media={media} />
-              ))
+              <div className="flex-1 overflow-y-auto px-5 pb-5">
+                <div className="grid grid-cols-2 gap-3 items-start">
+                  {selected.map((acc) => (
+                    <PreviewCard key={acc.id} account={acc} content={content} media={media} />
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>

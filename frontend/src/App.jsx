@@ -19,6 +19,7 @@ import CalendarPage from './pages/app/CalendarPage';
 import AccountsPage from './pages/app/AccountsPage';
 import AnalyticsPage from './pages/app/AnalyticsPage';
 import PostsPage from './pages/app/PostsPage';
+import ChannelPublishPage from './pages/app/ChannelPublishPage';
 import SettingsPage from './pages/app/SettingsPage';
 import BillingPage from './pages/app/BillingPage';
 import AdminPage from './pages/admin/AdminPage';
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="compose/:postId" element={<ComposePage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="posts" element={<PostsPage />} />
+        <Route path="channel/:accountId" element={<ChannelPublishPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="settings" element={<SettingsPage />} />

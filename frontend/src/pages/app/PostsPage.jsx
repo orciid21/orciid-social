@@ -54,7 +54,7 @@ export default function PostsPage() {
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to publish'); }
   };
 
-  const statuses = ['ALL', 'DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED'];
+  const statuses = ['ALL', 'DRAFT', 'SCHEDULED', 'PUBLISHED'];
 
   return (
     <div className="space-y-5">

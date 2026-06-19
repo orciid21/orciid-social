@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { authenticate } = require('../middleware/auth.middleware');
 const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
+const emailService = require('../services/email.service');
 
 router.use(authenticate);
 
@@ -112,6 +113,14 @@ router.post('/team/invite', async (req, res, next) => {
         create: { workspaceId: workspace.id, email, role: inviteRole, invitedBy: req.user.id },
       });
     }
+
+    // Notify the invitee by email (non-fatal — needs SMTP_* env configured).
+    try {
+      await emailService.sendInvitationEmail(email, req.user.name, workspace.name, inviteRole);
+    } catch (mailErr) {
+      console.warn('Invitation email failed (SMTP not configured?):', mailErr.message);
+    }
+
     res.status(201).json(await teamPayload(workspace.id, role, req.user.id));
   } catch (err) { next(err); }
 });

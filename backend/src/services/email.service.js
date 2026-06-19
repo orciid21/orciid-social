@@ -78,4 +78,20 @@ const sendPasswordResetEmail = async (email, name, token) => {
   });
 };
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail, verifyConnection, isConfigured };
+const sendInvitationEmail = async (email, inviterName, workspaceName, role) => {
+  const url = `${process.env.FRONTEND_URL}/register?email=${encodeURIComponent(email)}`;
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: email,
+    subject: `${inviterName} invited you to ${workspaceName} on Orciid Social`,
+    html: emailTemplate(`
+      <h2>You're invited! 🎉</h2>
+      <p><strong>${inviterName}</strong> invited you to join <strong>${workspaceName}</strong> on Orciid Social as a <strong>${String(role || 'member').toLowerCase()}</strong>.</p>
+      <p>Sign up with this email address (<strong>${email}</strong>) to join the team and start collaborating on social posts.</p>
+      <a href="${url}" class="btn">Join the team</a>
+      <p style="color:#9ca3af;font-size:13px;">If you weren't expecting this invitation, you can safely ignore this email.</p>
+    `),
+  });
+};
+
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendInvitationEmail, verifyConnection, isConfigured };

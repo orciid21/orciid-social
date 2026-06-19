@@ -206,6 +206,7 @@ enum Platform {
 
 enum PostStatus {
   DRAFT
+  PENDING_APPROVAL
   SCHEDULED
   PUBLISHED
   FAILED

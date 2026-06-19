@@ -7,6 +7,7 @@ import {
   PlusIcon, PencilIcon, TrashIcon, PaperAirplaneIcon, DocumentTextIcon,
   ClockIcon, CheckBadgeIcon, ChatBubbleLeftRightIcon, ChartBarIcon, LockClosedIcon,
   HandThumbUpIcon, ChatBubbleOvalLeftIcon, EyeIcon, ShareIcon, CursorArrowRaysIcon,
+  CheckIcon, XMarkIcon,
 } from '@heroicons/react/24/outline';
 import ChannelAvatar from '../../components/ChannelAvatar';
 
@@ -51,18 +52,31 @@ export default function ChannelPublishPage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('queue');
+  const [role, setRole] = useState('OWNER');
 
   const load = async () => {
     setLoading(true);
     try {
-      const [accRes, postRes] = await Promise.all([
+      const [accRes, postRes, teamRes] = await Promise.all([
         api.get('/social'),
         api.get('/posts', { params: { limit: 200 } }),
+        api.get('/workspaces/team').catch(() => null),
       ]);
       setAccount(accRes.data.find((a) => a.id === accountId) || null);
       setPosts(postRes.data.posts || []);
+      if (teamRes?.data?.currentRole) setRole(teamRes.data.currentRole);
     } catch { toast.error('Failed to load channel'); }
     finally { setLoading(false); }
+  };
+
+  const canReview = role === 'OWNER' || role === 'ADMIN';
+  const handleApprove = async (id) => {
+    try { await api.post(`/posts/${id}/approve`); toast.success('Approved'); load(); }
+    catch (err) { toast.error(err.response?.data?.error || 'Failed to approve'); }
+  };
+  const handleReject = async (id) => {
+    try { await api.post(`/posts/${id}/reject`); toast.success('Sent back to drafts'); load(); }
+    catch (err) { toast.error(err.response?.data?.error || 'Failed to reject'); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [accountId]);
 
@@ -210,7 +224,18 @@ export default function ChannelPublishPage() {
                           </div>
                           <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap break-words line-clamp-4">{post.content}</p>
                         </div>
-                        {post.status !== 'PUBLISHED' && (
+                        {post.status === 'PENDING_APPROVAL' ? (
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {canReview ? (
+                              <>
+                                <button onClick={() => handleReject(post.id)} className="flex items-center gap-1 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="Reject"><XMarkIcon className="w-4 h-4" /> Reject</button>
+                                <button onClick={() => handleApprove(post.id)} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg" title="Approve"><CheckIcon className="w-4 h-4" /> Approve</button>
+                              </>
+                            ) : (
+                              <span className="text-xs px-2 py-1 rounded-md bg-amber-50 text-amber-600 border border-amber-200">Pending review</span>
+                            )}
+                          </div>
+                        ) : post.status !== 'PUBLISHED' && (
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <Link to={`/compose/${post.id}`} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="Edit"><PencilIcon className="w-4 h-4" /></Link>
                             <button onClick={() => handlePublishNow(post.id)} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Publish now"><PaperAirplaneIcon className="w-4 h-4" /></button>

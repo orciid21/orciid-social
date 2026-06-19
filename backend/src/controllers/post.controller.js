@@ -14,9 +14,20 @@ const SAFE_SOCIAL_ACCOUNT_SELECT = {
   isActive: true,
 };
 
+// The user's primary workspace + their role in it. OWNER sorts first (MySQL
+// enum order OWNER<ADMIN<MEMBER), so an owner of any workspace is treated as the
+// owner. Used for the approval flow + team-scoped post visibility.
+const getMyWorkspace = async (userId) => {
+  const m = await prisma.workspaceMember.findFirst({
+    where: { userId },
+    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+  });
+  return { workspaceId: m?.workspaceId || null, role: m?.role || 'OWNER' };
+};
+
 const createPost = async (req, res, next) => {
   try {
-    const { content, mediaUrls = [], accountIds, scheduledAt, workspaceId } = req.body;
+    const { content, mediaUrls = [], accountIds, scheduledAt } = req.body;
     const userId = req.user.id;
 
     if (!accountIds || accountIds.length === 0) {
@@ -32,7 +43,12 @@ const createPost = async (req, res, next) => {
       throw new AppError('One or more accounts are invalid', 400);
     }
 
-    const status = scheduledAt ? 'SCHEDULED' : 'DRAFT';
+    // Team approval: posts from a MEMBER need an owner/admin to approve before
+    // they go live, so they're parked as PENDING_APPROVAL (and never scheduled
+    // until approved). Owners/admins post directly.
+    const { workspaceId, role } = await getMyWorkspace(userId);
+    const needsApproval = role === 'MEMBER';
+    const status = needsApproval ? 'PENDING_APPROVAL' : (scheduledAt ? 'SCHEDULED' : 'DRAFT');
 
     const post = await prisma.post.create({
       data: {
@@ -54,7 +70,7 @@ const createPost = async (req, res, next) => {
       },
     });
 
-    if (scheduledAt) {
+    if (status === 'SCHEDULED' && scheduledAt) {
       await schedulerService.schedulePost(post.id, new Date(scheduledAt));
     }
 
@@ -69,10 +85,14 @@ const getPosts = async (req, res, next) => {
     const { status, from, to, page = 1, limit = 20 } = req.query;
     const userId = req.user.id;
 
+    // Team-scoped: a user sees their own posts AND everything in their workspace
+    // (so owners/admins can review members' PENDING_APPROVAL posts, and the team
+    // shares one queue). Solo users just see their own.
+    const { workspaceId } = await getMyWorkspace(userId);
     const where = {
-      userId,
       ...(status && { status }),
       ...(from && to && { scheduledAt: { gte: new Date(from), lte: new Date(to) } }),
+      OR: [{ userId }, ...(workspaceId ? [{ workspaceId }] : [])],
     };
 
     const [posts, total] = await Promise.all([
@@ -189,4 +209,50 @@ const getCalendar = async (req, res, next) => {
   }
 };
 
-module.exports = { createPost, getPosts, getPost, updatePost, deletePost, publishNow, getCalendar };
+// --- Approvals (team roles) ------------------------------------------------
+// Only OWNER/ADMIN of the workspace may approve/reject, and only posts in their
+// workspace that are PENDING_APPROVAL.
+const loadPendingForReview = async (req) => {
+  const { workspaceId, role } = await getMyWorkspace(req.user.id);
+  if (role !== 'OWNER' && role !== 'ADMIN') {
+    throw new AppError('Only owners and admins can review posts', 403);
+  }
+  const post = await prisma.post.findFirst({ where: { id: req.params.id, workspaceId } });
+  if (!post) throw new AppError('Post not found', 404);
+  if (post.status !== 'PENDING_APPROVAL') throw new AppError('This post is not awaiting approval', 400);
+  return post;
+};
+
+// POST /api/posts/:id/approve — push the post live: schedule it if it has a
+// future time, otherwise publish immediately.
+const approvePost = async (req, res, next) => {
+  try {
+    const post = await loadPendingForReview(req);
+    const future = post.scheduledAt && new Date(post.scheduledAt) > new Date();
+    await prisma.post.update({ where: { id: post.id }, data: { status: 'SCHEDULED' } });
+    await prisma.postAccount.updateMany({ where: { postId: post.id }, data: { status: 'SCHEDULED' } });
+    if (future) {
+      await schedulerService.schedulePost(post.id, new Date(post.scheduledAt));
+      res.json({ message: 'Approved and scheduled' });
+    } else {
+      await schedulerService.publishPostNow(post.id);
+      res.json({ message: 'Approved and publishing now' });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/posts/:id/reject — send it back to the author as a draft.
+const rejectPost = async (req, res, next) => {
+  try {
+    const post = await loadPendingForReview(req);
+    await prisma.post.update({ where: { id: post.id }, data: { status: 'DRAFT', scheduledAt: null } });
+    await prisma.postAccount.updateMany({ where: { postId: post.id }, data: { status: 'DRAFT' } });
+    res.json({ message: 'Post rejected and returned to drafts' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { createPost, getPosts, getPost, updatePost, deletePost, publishNow, getCalendar, approvePost, rejectPost };

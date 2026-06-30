@@ -17,7 +17,7 @@ const API_BASE = 'https://open.tiktokapis.com/v2';
 // screen leads with the essentials.
 const SCOPES = 'user.info.basic,user.info.profile,user.info.stats,video.upload,video.list';
 
-const buildAuthUrl = ({ redirectUri, state }) => {
+const buildAuthUrl = ({ redirectUri, state, force }) => {
   const params = new URLSearchParams({
     client_key: TIKTOK_CLIENT_KEY,
     scope: SCOPES,
@@ -25,6 +25,10 @@ const buildAuthUrl = ({ redirectUri, state }) => {
     redirect_uri: redirectUri,
     state,
   });
+  // "Add another account" → disable_auto_auth=1 forces TikTok to always show the
+  // authorization screen instead of silently auto-authing the logged-in account,
+  // so the user can switch to / log in with a different TikTok account.
+  if (force) params.set('disable_auto_auth', '1');
   return `${AUTH_BASE}?${params.toString()}`;
 };
 

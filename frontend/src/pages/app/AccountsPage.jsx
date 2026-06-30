@@ -23,6 +23,8 @@ export default function AccountsPage() {
 
   // Instagram connect explainer (Buffer-style "Professional vs Personal")
   const [igModalOpen, setIgModalOpen] = useState(false);
+  // When the IG modal was opened via "Add another", force the IG login screen.
+  const [igForce, setIgForce] = useState(false);
 
   // Facebook Page picker
   const [fbModalOpen, setFbModalOpen] = useState(false);
@@ -134,10 +136,12 @@ export default function AccountsPage() {
     }
   };
 
-  const startConnect = async (platformId) => {
+  const startConnect = async (platformId, force = false) => {
     try {
       setConnecting(platformId);
-      const res = await api.get(`/social/connect/${platformId}`);
+      // force=1 (from "Add another account") tells the backend to force the
+      // provider's login / account-chooser so a DIFFERENT account can be added.
+      const res = await api.get(`/social/connect/${platformId}${force ? '?force=1' : ''}`);
       window.location.href = res.data.url;
     } catch {
       toast.error('Failed to start OAuth flow');
@@ -145,14 +149,15 @@ export default function AccountsPage() {
     }
   };
 
-  const handleConnect = (platformId) => {
+  const handleConnect = (platformId, force = false) => {
     // Buffer-style explainer first: Instagram needs a Professional account,
     // and the user should know what they're choosing before the OAuth screen.
     if (platformId === 'INSTAGRAM') {
+      setIgForce(force);
       setIgModalOpen(true);
       return;
     }
-    startConnect(platformId);
+    startConnect(platformId, force);
   };
 
   const handleDisconnect = async (accountId, name) => {
@@ -231,7 +236,7 @@ export default function AccountsPage() {
               {/* Connect / Add another */}
               <div className="px-5 py-3 bg-gray-50/60">
                 <button
-                  onClick={() => handleConnect(platform.id)}
+                  onClick={() => handleConnect(platform.id, count > 0)}
                   disabled={isConnecting}
                   className="btn-secondary text-xs w-full justify-center"
                 >
@@ -252,7 +257,7 @@ export default function AccountsPage() {
       <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
         <ExclamationTriangleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-blue-700">
-          <span className="font-semibold">Adding a second account on the same platform?</span> Before pressing “Add another”, sign in to the account you want on that platform (or use its “Switch account” option) — otherwise it reconnects the same one. For Facebook, the picker lets you select several Pages at once.
+          <span className="font-semibold">Adding a second account on the same platform?</span> Pressing “Add another” now opens a fresh sign-in so you can choose a different account. For Facebook, the picker lets you select several Pages at once. Exception: X (Twitter) has no account switcher here — log out of x.com (or use a private window) before adding a second X account.
         </p>
       </div>
 
@@ -393,7 +398,7 @@ export default function AccountsPage() {
                   <li className="flex gap-2"><CheckIcon className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" strokeWidth={3} /><span><b>No Facebook Page needed</b> — sign in with Instagram</span></li>
                 </ul>
                 <button
-                  onClick={() => { setIgModalOpen(false); startConnect('INSTAGRAM'); }}
+                  onClick={() => { setIgModalOpen(false); startConnect('INSTAGRAM', igForce); }}
                   disabled={connecting === 'INSTAGRAM'}
                   className="mt-5 w-full rounded-xl bg-green-200 hover:bg-green-300 text-gray-900 font-semibold text-sm py-3 transition-colors disabled:opacity-60"
                 >

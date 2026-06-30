@@ -58,15 +58,19 @@ const getConnectUrl = (req, res) => {
   const { platform } = req.params;
   const baseUrl = getApiBaseUrl();
   const token = req.headers.authorization?.split(' ')[1];
+  // "Add another account" sets ?force=1 → forward it so the OAuth route can force
+  // the provider's login / account-chooser screen, letting the user pick a
+  // DIFFERENT account instead of silently re-connecting the one already logged in.
+  const force = req.query.force ? '&force=1' : '';
 
   const urls = {
-    FACEBOOK: `${baseUrl}/auth/facebook?token=${token}`,
-    TWITTER: `${baseUrl}/auth/twitter?token=${token}`,
-    LINKEDIN: `${baseUrl}/auth/linkedin?token=${token}`,
-    TIKTOK: `${baseUrl}/auth/tiktok?token=${token}`,
-    INSTAGRAM: `${baseUrl}/auth/instagram?token=${token}`,
-    THREADS: `${baseUrl}/auth/threads?token=${token}`,
-    YOUTUBE: `${baseUrl}/auth/youtube?token=${token}`,
+    FACEBOOK: `${baseUrl}/auth/facebook?token=${token}${force}`,
+    TWITTER: `${baseUrl}/auth/twitter?token=${token}${force}`,
+    LINKEDIN: `${baseUrl}/auth/linkedin?token=${token}${force}`,
+    TIKTOK: `${baseUrl}/auth/tiktok?token=${token}${force}`,
+    INSTAGRAM: `${baseUrl}/auth/instagram?token=${token}${force}`,
+    THREADS: `${baseUrl}/auth/threads?token=${token}${force}`,
+    YOUTUBE: `${baseUrl}/auth/youtube?token=${token}${force}`,
   };
 
   const url = urls[platform.toUpperCase()];

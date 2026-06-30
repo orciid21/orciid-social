@@ -263,13 +263,17 @@ const IG_LOGIN_APP_ID = process.env.INSTAGRAM_APP_ID || '1402647338362389'; // O
 const IG_GRAPH = 'https://graph.instagram.com';
 
 router.get('/instagram', (req, res) => {
-  const { token } = req.query;
+  const { token, force } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = process.env.INSTAGRAM_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/instagram/callback`;
   // Publishing needs only basic + content_publish; a shorter consent screen
   // converts better. Comments/messages scopes can be added when those ship.
   const scope = 'instagram_business_basic,instagram_business_content_publish';
-  const igUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_LOGIN_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
+  // "Add another account" → force_reauth=true makes Instagram show its login
+  // screen instead of silently reusing the instagram.com session, so the user
+  // can sign in with a DIFFERENT professional account (documented Meta param).
+  const reauth = force ? '&force_reauth=true' : '';
+  const igUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_LOGIN_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}${reauth}`;
   res.redirect(igUrl);
 });
 
@@ -345,11 +349,15 @@ router.get('/instagram/callback', async (req, res) => {
 const THREADS_GRAPH = 'https://graph.threads.net';
 
 router.get('/threads', (req, res) => {
-  const { token } = req.query;
+  const { token, force } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = process.env.THREADS_CALLBACK_URL || `${getOAuthBaseUrl()}/auth/threads/callback`;
   const scope = 'threads_basic,threads_content_publish';
-  const url = `https://threads.net/oauth/authorize?client_id=${process.env.THREADS_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
+  // "Add another account" → force_reauth=true (same Meta param family as the
+  // Instagram Login flow) prompts a fresh login for a different account. Harmless
+  // no-op if Threads ignores it on threads.net.
+  const reauth = force ? '&force_reauth=true' : '';
+  const url = `https://threads.net/oauth/authorize?client_id=${process.env.THREADS_APP_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}${reauth}`;
   res.redirect(url);
 });
 
@@ -422,10 +430,10 @@ router.get('/threads/callback', async (req, res) => {
 // Runs against the app Sandbox until App Review passes. The connecting account
 // must be a Sandbox Target User. Tokens live on open.tiktokapis.com.
 router.get('/tiktok', (req, res) => {
-  const { token } = req.query;
+  const { token, force } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = callbackUrl('tiktok', 'TIKTOK_CALLBACK_URL');
-  res.redirect(tiktokService.buildAuthUrl({ redirectUri: redirect, state }));
+  res.redirect(tiktokService.buildAuthUrl({ redirectUri: redirect, state, force: !!force }));
 });
 
 router.get('/tiktok/callback', async (req, res) => {
@@ -473,10 +481,10 @@ router.get('/tiktok/callback', async (req, res) => {
 // Connect = Google sign-in (youtube.upload + youtube.readonly); publish = video
 // upload. Tokens come from Google and refresh against a long-lived refresh_token.
 router.get('/youtube', (req, res) => {
-  const { token } = req.query;
+  const { token, force } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = callbackUrl('youtube', 'YOUTUBE_CALLBACK_URL');
-  res.redirect(youtubeService.buildAuthUrl({ redirectUri: redirect, state }));
+  res.redirect(youtubeService.buildAuthUrl({ redirectUri: redirect, state, force: !!force }));
 });
 
 router.get('/youtube/callback', async (req, res) => {

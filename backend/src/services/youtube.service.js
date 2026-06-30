@@ -23,16 +23,17 @@ const SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
 ].join(' ');
 
-const buildAuthUrl = ({ redirectUri, state }) => {
+const buildAuthUrl = ({ redirectUri, state, force }) => {
   const params = new URLSearchParams({
     client_id: process.env.YOUTUBE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: SCOPES,
     // offline + consent = always return a refresh_token (Google only sends it on
-    // the first consent unless prompt=consent is forced).
+    // the first consent unless prompt=consent is forced). "Add another account"
+    // adds select_account so the user can pick a DIFFERENT Google account.
     access_type: 'offline',
-    prompt: 'consent',
+    prompt: force ? 'consent select_account' : 'consent',
     include_granted_scopes: 'true',
     state,
   });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -14,6 +14,30 @@ const PLATFORMS = [
   { id: 'THREADS', name: 'Threads', desc: 'Text, photo & video posts' },
   { id: 'YOUTUBE', name: 'YouTube', desc: 'Upload videos to your channel' },
 ];
+
+// Platforms whose connect flow is a single OAuth redirect we can run inside a
+// popup window so the dashboard stays open in the original tab. Facebook is
+// excluded — its flow has a follow-up Page-picker step rendered on /accounts.
+const POPUP_PLATFORMS = new Set(['INSTAGRAM', 'THREADS', 'TIKTOK', 'YOUTUBE', 'TWITTER', 'LINKEDIN']);
+const POPUP_NAME = 'orciid_oauth';
+
+// Map raw OAuth-callback error codes to messages a non-developer can act on.
+const OAUTH_ERROR_MESSAGES = {
+  no_instagram_business_account:
+    'No Instagram account is linked to your Facebook Page yet. Open your Page settings (Meta Business Suite → Settings → Linked accounts → Instagram), link your Instagram Business account, then press Connect again.',
+  tiktok_not_configured: 'TikTok isn\'t fully set up yet (missing API secret). Please try again shortly.',
+  tiktok_failed: 'TikTok connection failed. Make sure this TikTok account is added as a Target User in the app Sandbox, then try again.',
+  linkedin_not_configured: 'LinkedIn isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+  linkedin_failed: 'LinkedIn connection failed. Please try connecting again. If it keeps failing, the LinkedIn app may need re-approval.',
+  twitter_not_configured: 'X (Twitter) isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+  twitter_failed: 'X (Twitter) connection failed. Please try connecting again.',
+  threads_not_configured: 'Threads isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+  threads_failed: 'Threads connection failed. Make sure your Threads account has accepted the app\'s tester invite (Threads → Settings → Website permissions → Invites), then try again.',
+  youtube_not_configured: 'YouTube isn\'t fully set up yet (missing API credentials). Please try again shortly.',
+  youtube_failed: 'YouTube connection failed. Make sure your Google account is added as a Test user on the app\'s OAuth consent screen, then try again.',
+};
+const friendlyOAuthError = (error) =>
+  OAUTH_ERROR_MESSAGES[error] || `Failed to connect: ${String(error).replace(/_/g, ' ')}`;
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState([]);
@@ -33,42 +57,53 @@ export default function AccountsPage() {
   const [fbSaving, setFbSaving] = useState(false);
   const [selectedPageIds, setSelectedPageIds] = useState([]);
 
+  // True when THIS document is the OAuth popup we opened. window.name survives
+  // the cross-origin hop to the provider and back, even if window.opener gets
+  // nulled, so it's a reliable popup marker.
+  const isOAuthPopup = typeof window !== 'undefined' && window.name === POPUP_NAME;
+  // Set once the popup result is handled via postMessage, so the popup-closed
+  // poll below doesn't double-handle the same connect.
+  const oauthHandledRef = useRef(false);
+
   useEffect(() => {
-    // Show notifications from OAuth callback
     const connected = searchParams.get('connected');
     const error = searchParams.get('error');
-    if (connected) toast.success(`${connected} connected successfully!`);
-    if (error) {
-      // Map raw OAuth-callback error codes to messages a non-developer can act on.
-      const friendly = {
-        no_instagram_business_account:
-          'No Instagram account is linked to your Facebook Page yet. Open your Page settings (Meta Business Suite → Settings → Linked accounts → Instagram), link your Instagram Business account, then press Connect again.',
-        tiktok_not_configured:
-          'TikTok isn\'t fully set up yet (missing API secret). Please try again shortly.',
-        tiktok_failed:
-          'TikTok connection failed. Make sure this TikTok account is added as a Target User in the app Sandbox, then try again.',
-        linkedin_not_configured:
-          'LinkedIn isn\'t fully set up yet (missing API credentials). Please try again shortly.',
-        linkedin_failed:
-          'LinkedIn connection failed. Please try connecting again. If it keeps failing, the LinkedIn app may need re-approval.',
-        twitter_not_configured:
-          'X (Twitter) isn\'t fully set up yet (missing API credentials). Please try again shortly.',
-        twitter_failed:
-          'X (Twitter) connection failed. Please try connecting again.',
-        threads_not_configured:
-          'Threads isn\'t fully set up yet (missing API credentials). Please try again shortly.',
-        threads_failed:
-          'Threads connection failed. Make sure your Threads account has accepted the app\'s tester invite (Threads → Settings → Website permissions → Invites), then try again.',
-        youtube_not_configured:
-          'YouTube isn\'t fully set up yet (missing API credentials). Please try again shortly.',
-        youtube_failed:
-          'YouTube connection failed. Make sure your Google account is added as a Test user on the app\'s OAuth consent screen, then try again.',
-      }[error];
-      toast.error(friendly || `Failed to connect: ${error.replace(/_/g, ' ')}`, { duration: 8000 });
+
+    // Inside the popup: hand the result to the dashboard tab and close. The
+    // dashboard was never navigated away, so the user stays where they were.
+    if (isOAuthPopup && (connected || error)) {
+      try {
+        if (window.opener && window.opener !== window) {
+          window.opener.postMessage({ source: 'orciid-oauth', connected, error }, window.location.origin);
+        }
+      } catch (_) { /* ignore */ }
+      window.close();
+      return;
     }
+
+    // Full-page returns (e.g. Facebook, or popup-blocked fallback) surface here.
+    if (connected) toast.success(`${connected} connected successfully!`);
+    if (error) toast.error(friendlyOAuthError(error), { duration: 8000 });
     // After Facebook OAuth, let the user choose which Page(s) to connect.
     if (searchParams.get('select') === 'facebook') openFacebookPicker();
     fetchAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Dashboard tab: receive the OAuth result the popup posts back, then refresh.
+  useEffect(() => {
+    if (isOAuthPopup) return;
+    const onMessage = (e) => {
+      if (e.origin !== window.location.origin) return;
+      if (!e.data || e.data.source !== 'orciid-oauth') return;
+      oauthHandledRef.current = true;
+      setConnecting(null);
+      if (e.data.connected) toast.success(`${e.data.connected} connected successfully!`);
+      if (e.data.error) toast.error(friendlyOAuthError(e.data.error), { duration: 8000 });
+      fetchAccounts();
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -136,14 +171,65 @@ export default function AccountsPage() {
     }
   };
 
+  const popupFeatures = () => {
+    const w = 600;
+    const h = 760;
+    const left = window.screenX + Math.max(0, (window.outerWidth - w) / 2);
+    const top = window.screenY + Math.max(0, (window.outerHeight - h) / 2);
+    return `width=${w},height=${h},left=${left},top=${top}`;
+  };
+
+  // Once the popup is navigating the OAuth flow, watch for it closing. The popup
+  // posts its result back (handled by the message effect). If it's closed without
+  // a message — e.g. the provider dropped the user on its own feed, or they
+  // cancelled — re-check the list on close and nudge them if nothing connected.
+  const trackOAuthPopup = (popup) => {
+    const before = accounts.length;
+    const timer = setInterval(() => {
+      if (!popup.closed) return;
+      clearInterval(timer);
+      setConnecting(null);
+      if (oauthHandledRef.current) return; // already handled via postMessage
+      api.get('/social').then((r) => {
+        setAccounts(r.data);
+        if (r.data.length <= before) {
+          toast('If your account wasn’t added, sign in with the account you want in the popup, then try again.', { icon: 'ℹ️', duration: 8000 });
+        } else {
+          toast.success('Account connected!');
+        }
+      }).catch(() => {});
+    }, 1000);
+  };
+
   const startConnect = async (platformId, force = false) => {
+    const usePopup = POPUP_PLATFORMS.has(platformId);
+    // Open the popup synchronously inside the click gesture (before any await) so
+    // browsers don't block it as an unsolicited popup; navigate it once the
+    // backend returns the provider URL.
+    let popup = null;
+    if (usePopup) {
+      oauthHandledRef.current = false;
+      popup = window.open('', POPUP_NAME, popupFeatures());
+      try { popup?.document.write('<p style="font:15px sans-serif;color:#555;padding:24px">Connecting…</p>'); } catch (_) { /* ignore */ }
+    }
     try {
       setConnecting(platformId);
       // force=1 (from "Add another account") tells the backend to force the
       // provider's login / account-chooser so a DIFFERENT account can be added.
       const res = await api.get(`/social/connect/${platformId}${force ? '?force=1' : ''}`);
-      window.location.href = res.data.url;
+      const url = res.data.url;
+      if (usePopup) {
+        if (!popup || popup.closed) {
+          window.location.href = url; // popup blocked → full-page fallback
+          return;
+        }
+        popup.location.href = url;
+        trackOAuthPopup(popup);
+      } else {
+        window.location.href = url; // Facebook keeps its full-page Page-picker flow
+      }
     } catch {
+      if (popup && !popup.closed) popup.close();
       toast.error('Failed to start OAuth flow');
       setConnecting(null);
     }
@@ -257,7 +343,7 @@ export default function AccountsPage() {
       <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
         <ExclamationTriangleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-blue-700">
-          <span className="font-semibold">Adding a second account on the same platform?</span> Pressing “Add another” now opens a fresh sign-in so you can choose a different account. For Facebook, the picker lets you select several Pages at once. Exception: X (Twitter) has no account switcher here — log out of x.com (or use a private window) before adding a second X account.
+          <span className="font-semibold">Adding a second account on the same platform?</span> Pressing “Add another” opens a small sign-in window — sign in there with the account you want and it’s added to your list automatically (your dashboard stays open). For Facebook, the picker lets you select several Pages at once. Exception: X (Twitter) has no account switcher — log out of x.com (or use a private window) before adding a second X account.
         </p>
       </div>
 

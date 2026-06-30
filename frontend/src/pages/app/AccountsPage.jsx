@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { LinkIcon, TrashIcon, CheckCircleIcon, ExclamationTriangleIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { LinkIcon, TrashIcon, CheckCircleIcon, ExclamationTriangleIcon, XMarkIcon, CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { PLATFORM_LOGOS } from '../../utils/platforms';
 
 const PLATFORMS = [
@@ -166,100 +166,93 @@ export default function AccountsPage() {
     }
   };
 
-  const connectedPlatforms = new Set(accounts.map((a) => a.platform));
-
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Social Accounts</h1>
-        <p className="text-gray-500 text-sm mt-1">Connect your social media accounts to start publishing</p>
+        <p className="text-gray-500 text-sm mt-1">Connect one or more accounts per platform to start publishing</p>
       </div>
 
-      {/* Connected accounts */}
-      {accounts.length > 0 && (
-        <div className="card">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900">Connected ({accounts.length})</h2>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {accounts.map((acc) => {
-              const platform = PLATFORMS.find((p) => p.id === acc.platform);
-              return (
-                <div key={acc.id} className="flex items-center gap-4 px-5 py-4">
-                  <img
-                    src={PLATFORM_LOGOS[acc.platform]}
-                    alt={platform?.name}
-                    className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{acc.name}</p>
-                    <p className="text-xs text-gray-500">{platform?.name} · {acc.username ? `@${acc.username}` : 'Connected'}</p>
-                  </div>
-                  <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
-                  <button
-                    onClick={() => handleDisconnect(acc.id, acc.name)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Available platforms */}
-      <div className="card">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Add Account</h2>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {PLATFORMS.map((platform) => {
-            const isConnected = connectedPlatforms.has(platform.id);
-            const isConnecting = connecting === platform.id;
-            return (
-              <div key={platform.id} className="flex items-center gap-4 px-5 py-4">
+      {/* One card per platform: the account(s) already connected on it, plus an
+          explicit "Add another" button so multiple accounts per platform are
+          obviously supported (e.g. several Instagram accounts or Facebook Pages). */}
+      <div className="space-y-4">
+        {PLATFORMS.map((platform) => {
+          const platformAccounts = accounts.filter((a) => a.platform === platform.id);
+          const count = platformAccounts.length;
+          const isConnecting = connecting === platform.id;
+          return (
+            <div key={platform.id} className="card overflow-hidden">
+              {/* Platform header */}
+              <div className="flex items-center gap-4 px-5 py-4 border-b border-gray-100">
                 <img
                   src={PLATFORM_LOGOS[platform.id]}
                   alt={platform.name}
                   className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
                 />
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm">{platform.name}</p>
                   <p className="text-xs text-gray-500">{platform.desc}</p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {isConnected && (
-                    <span className="badge bg-green-100 text-green-700 flex items-center gap-1">
-                      <CheckCircleIcon className="w-3.5 h-3.5" />
-                      Connected
-                    </span>
-                  )}
-                  {/* Always offer (re)connect. Facebook in particular needs this:
-                      a personal profile can't publish, so the user must reconnect
-                      and pick a Page — and there was previously no button to do so
-                      once any Facebook account was connected. */}
-                  <button
-                    onClick={() => handleConnect(platform.id)}
-                    disabled={isConnecting}
-                    className="btn-secondary text-xs"
-                  >
-                    <LinkIcon className="w-3.5 h-3.5" />
-                    {isConnecting ? 'Connecting...' : isConnected ? 'Reconnect' : 'Connect'}
-                  </button>
-                </div>
+                {count > 0 && (
+                  <span className="badge bg-green-100 text-green-700 flex items-center gap-1 flex-shrink-0">
+                    <CheckCircleIcon className="w-3.5 h-3.5" />
+                    {count} connected
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </div>
+
+              {/* Connected account(s) on this platform */}
+              {count > 0 && (
+                <div className="divide-y divide-gray-50">
+                  {platformAccounts.map((acc) => (
+                    <div key={acc.id} className="flex items-center gap-3 px-5 py-3">
+                      <img
+                        src={acc.avatar || PLATFORM_LOGOS[acc.platform]}
+                        alt=""
+                        className={`w-8 h-8 rounded-lg flex-shrink-0 ${acc.avatar ? 'object-cover' : 'object-contain'}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm truncate">{acc.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{acc.username ? `@${acc.username}` : 'Connected'}</p>
+                      </div>
+                      <button
+                        onClick={() => handleDisconnect(acc.id, acc.name)}
+                        title="Disconnect"
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Connect / Add another */}
+              <div className="px-5 py-3 bg-gray-50/60">
+                <button
+                  onClick={() => handleConnect(platform.id)}
+                  disabled={isConnecting}
+                  className="btn-secondary text-xs w-full justify-center"
+                >
+                  {count > 0 ? <PlusIcon className="w-3.5 h-3.5" /> : <LinkIcon className="w-3.5 h-3.5" />}
+                  {isConnecting
+                    ? 'Connecting…'
+                    : count > 0
+                      ? `Add another ${platform.name} account`
+                      : `Connect ${platform.name}`}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Note */}
-      <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-        <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-        <p className="text-sm text-amber-700">
-          <span className="font-semibold">API credentials required:</span> Each platform requires you to register an app in their developer portal and add the credentials to your <code className="bg-amber-100 px-1 rounded">.env</code> file. See the setup guide for details.
+      {/* Multi-account tip */}
+      <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+        <ExclamationTriangleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-blue-700">
+          <span className="font-semibold">Adding a second account on the same platform?</span> Before pressing “Add another”, sign in to the account you want on that platform (or use its “Switch account” option) — otherwise it reconnects the same one. For Facebook, the picker lets you select several Pages at once.
         </p>
       </div>
 

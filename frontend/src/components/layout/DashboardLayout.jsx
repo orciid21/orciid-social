@@ -62,12 +62,12 @@ export default function DashboardLayout() {
       `}>
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">O</span>
-            </div>
-            <span className="font-bold text-gray-900 text-lg">Orciid</span>
-          </div>
+          <img
+            src="/brand/orciid-wordmark-black.png"
+            alt="ORCIID"
+            className="h-5 w-auto select-none"
+            draggable="false"
+          />
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-gray-600">
             <XMarkIcon className="w-5 h-5" />
           </button>

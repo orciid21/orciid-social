@@ -2,11 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "frontend",
+      "name": "orciid-frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "cwd": "/Users/macbook/orciid-social/frontend",
-      "port": 3000
+      "runtimeArgs": ["run", "--prefix", "/Users/macbook/orciid-social/frontend", "dev"],
+      "port": 5173
     }
   ]
 }

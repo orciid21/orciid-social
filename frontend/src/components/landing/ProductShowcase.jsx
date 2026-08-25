@@ -9,14 +9,14 @@ import { Reveal } from './Reveal';
    screenshot, so it stays crisp and weighs nothing. */
 
 const Frame = ({ label, children }) => (
-  <div className="w-[560px] sm:w-[620px] shrink-0 rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-900/5 overflow-hidden">
+  <div className="w-[380px] sm:w-[430px] shrink-0 rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-900/10 overflow-hidden">
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
       <span className="w-2 h-2 rounded-full bg-coral" />
       <span className="w-2 h-2 rounded-full bg-gray-200" />
       <span className="w-2 h-2 rounded-full bg-electric" />
       <span className="ml-2 text-[11px] font-semibold text-gray-500">{label}</span>
     </div>
-    <div className="p-4">{children}</div>
+    <div className="p-3">{children}</div>
   </div>
 );
 
@@ -179,46 +179,30 @@ function OverviewScreen() {
   );
 }
 
-const ScreenSet = () => (
-  <>
-    <AnalyticsScreen />
-    <ScheduleScreen />
-    <OverviewScreen />
-  </>
-);
-
-/* Closing statement that rides at the end of the track, like the reference. */
-const ClosingPanel = () => (
-  <div className="w-[520px] shrink-0 flex items-center px-10">
-    <p className="text-xl sm:text-2xl text-gray-500 leading-relaxed">
-      As your brand grows, the number of accounts grows with it.
-      <span className="text-gray-900 font-semibold"> ORCIID scales with you</span> —
-      add channels, invite teammates and hand off approvals without changing how
-      you work.
-    </p>
-  </div>
-);
+/* The screens don't sit side by side — as you scroll they slide over one
+   another, each tucking on top of the one before it, until the closing
+   statement is pulled into view. Panel i is shifted left by i x OVERLAP, so the
+   strip closes like a fan while its left edge stays put. */
+const SCREENS = [AnalyticsScreen, ScheduleScreen, OverviewScreen];
+const OVERLAP = 300; // px each panel eventually covers of its neighbour
 
 export default function ProductShowcase() {
-  const trackWrapRef = useRef(null);
-  const trackRef = useRef(null);
-  const [shift, setShift] = useState(0);
+  const wrapRef = useRef(null);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const pinned = window.matchMedia('(min-width: 1024px)').matches;
-    if (reduced || !pinned) return undefined; // small screens scroll the row natively
+    const wide = window.matchMedia('(min-width: 1024px)').matches;
+    if (reduced || !wide) return undefined; // small screens scroll the row natively
 
     let frame = 0;
     const update = () => {
       frame = 0;
-      const wrap = trackWrapRef.current;
-      const track = trackRef.current;
-      if (!wrap || !track) return;
-      const travel = Math.max(0, track.scrollWidth - window.innerWidth + 48);
+      const wrap = wrapRef.current;
+      if (!wrap) return;
       const distance = wrap.offsetHeight - window.innerHeight;
-      const progress = distance <= 0 ? 0 : (window.scrollY - wrap.offsetTop) / distance;
-      setShift(Math.min(1, Math.max(0, progress)) * travel);
+      const p = distance <= 0 ? 0 : (window.scrollY - wrap.offsetTop) / distance;
+      setProgress(Math.min(1, Math.max(0, p)));
     };
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update);
@@ -234,9 +218,11 @@ export default function ProductShowcase() {
     };
   }, []);
 
+  const slide = (i) => (i === 0 ? 0 : -Math.round(progress * OVERLAP));
+
   return (
     <section>
-      {/* The heading scrolls past normally — only the row below is pinned. */}
+      {/* The heading scrolls past normally — only the strip below is pinned. */}
       <Reveal className="max-w-3xl mx-auto px-4 text-center pt-20 lg:pt-28 pb-10 lg:pb-14">
         <span className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600">
           Tools that power your workflow
@@ -248,21 +234,23 @@ export default function ProductShowcase() {
         </h2>
       </Reveal>
 
-      {/* Tall spacer: while the page scrolls through it, the row sticks and
-          slides sideways, finishing on the closing statement. */}
-      <div ref={trackWrapRef} className="lg:h-[240vh] relative">
-        <div className="lg:sticky lg:top-24 flex items-start overflow-hidden pb-16 lg:pb-0">
-          <div className="relative w-full overflow-x-auto lg:overflow-visible">
-            <div
-              ref={trackRef}
-              className="flex gap-6 px-4 lg:px-10 w-max will-change-transform"
-              style={{ transform: `translate3d(-${shift}px,0,0)` }}
-            >
-              <ScreenSet />
-              <ClosingPanel />
+      <div ref={wrapRef} className="lg:h-[240vh] relative">
+        <div className="lg:sticky lg:top-24 overflow-hidden pb-16 lg:pb-0">
+          <div className="overflow-x-auto lg:overflow-visible">
+            <div className="flex items-start w-max pl-4 lg:pl-10">
+              {SCREENS.map((Screen, i) => (
+                <div
+                  key={i}
+                  className="relative"
+                  style={{ marginLeft: slide(i), zIndex: i + 1 }}
+                >
+                  <Screen />
+                </div>
+              ))}
+              <div className="relative" style={{ marginLeft: slide(1), zIndex: SCREENS.length + 1 }}>
+                <ClosingPanel />
+              </div>
             </div>
-            <div className="hidden lg:block pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-white to-transparent" />
-            <div className="hidden lg:block pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-white to-transparent" />
           </div>
         </div>
       </div>

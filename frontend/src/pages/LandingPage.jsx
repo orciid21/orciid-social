@@ -4,6 +4,8 @@ import {
   CheckIcon, ArrowRightIcon, UserGroupIcon, ClockIcon,
 } from '@heroicons/react/24/outline';
 import { PLATFORM_LOGOS } from '../utils/platforms';
+import ProductShowcase from '../components/landing/ProductShowcase';
+import FaqSection from '../components/landing/FaqSection';
 
 // Accent colours come from the ORCIID brand palette (Cobalt / Iris / Electric / Coral).
 const features = [
@@ -133,6 +135,7 @@ export default function LandingPage() {
             <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
             <a href="#how" className="hover:text-gray-900 transition-colors">How it works</a>
             <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
+            <a href="#faq" className="hover:text-gray-900 transition-colors">FAQ</a>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/login" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
@@ -271,6 +274,8 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <ProductShowcase />
+
       {/* How it works */}
       <section id="how" className="py-20 lg:py-24 px-4 bg-gray-50/70 border-y border-gray-100">
         <div className="max-w-6xl mx-auto">
@@ -344,6 +349,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      <FaqSection />
 
       {/* CTA */}
       <section className="px-4 pb-20">

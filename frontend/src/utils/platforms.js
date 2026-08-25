@@ -1,13 +1,14 @@
-import facebook from '../assets/platforms/facebook.png';
-import instagram from '../assets/platforms/instagram.png';
-import twitter from '../assets/platforms/twitter.png';
-import linkedin from '../assets/platforms/linkedin.png';
-import tiktok from '../assets/platforms/tiktok.png';
-import threads from '../assets/platforms/threads.png';
-import youtube from '../assets/platforms/youtube.png';
+import facebook from '../assets/platforms/facebook.svg';
+import instagram from '../assets/platforms/instagram.svg';
+import twitter from '../assets/platforms/twitter.svg';
+import linkedin from '../assets/platforms/linkedin.svg';
+import tiktok from '../assets/platforms/tiktok.svg';
+import threads from '../assets/platforms/threads.svg';
+import youtube from '../assets/platforms/youtube.svg';
 
-// Single source of truth for platform branding. The PNGs are the client's own
-// logo set (src/assets/platforms/) — use these everywhere instead of ad-hoc
+// Single source of truth for platform branding. These are the platforms' own
+// logo set (src/assets/platforms/) — the official brand marks, drawn as SVG
+// tiles so they stay sharp at any size. Use these everywhere instead of ad-hoc
 // colored circles / emoji so the whole app stays consistent.
 export const PLATFORM_LOGOS = {
   FACEBOOK: facebook,

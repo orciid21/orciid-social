@@ -57,3 +57,21 @@
 .platform-linkedin { background-color: #0A66C2; }
 .platform-tiktok { background-color: #000; }
 .platform-youtube { background-color: #FF0000; }
+
+/* Horizontal auto-scrolling showcase (product screens). The track holds the
+   cards twice, so translating by -50% loops seamlessly. Pauses on hover and
+   stands still for anyone who prefers reduced motion. */
+@keyframes orciid-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: orciid-marquee 55s linear infinite;
+}
+.marquee-viewport:hover .marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+  .marquee-viewport { overflow-x: auto; }
+}

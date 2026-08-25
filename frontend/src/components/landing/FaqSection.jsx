@@ -69,7 +69,7 @@ export default function FaqSection() {
           <span className="inline-flex items-center rounded-full border border-white/30 px-4 py-1.5 text-xs font-semibold text-white/90">
             Support questions
           </span>
-          <h2 className="mt-6 text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-white leading-[1.15] tracking-tight">
+          <h2 className="mt-6 text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-white leading-[1.25] tracking-tight">
             Everything you need to know
             <br className="hidden sm:block" /> about ORCIID Social
           </h2>

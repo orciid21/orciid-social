@@ -190,7 +190,7 @@ export default function ProductShowcase() {
         <span className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600">
           Tools that power your workflow
         </span>
-        <h2 className="mt-6 text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-gray-900 leading-[1.15] tracking-tight">
+        <h2 className="mt-6 text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-gray-900 leading-[1.25] tracking-tight">
           One workspace for planning,
           <br className="hidden sm:block" /> publishing and{' '}
           <span className="text-primary-600">proving the results</span>

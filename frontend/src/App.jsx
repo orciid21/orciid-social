@@ -10,6 +10,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import PrivacyPage from './pages/PrivacyPage';
+import LegalPage from './pages/LegalPage';
 
 // App pages (protected)
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -53,6 +54,7 @@ export default function App() {
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/legal" element={<LegalPage />} />
 
       {/* App */}
       <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>

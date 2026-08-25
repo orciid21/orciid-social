@@ -375,7 +375,9 @@ export default function LandingPage() {
           <img src="/brand/orciid-wordmark-black.png" alt="ORCIID" className="h-4 w-auto opacity-70" draggable="false" />
           <div className="flex items-center gap-6 text-sm text-gray-500">
             <Link to="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link>
+            <Link to="/legal" className="hover:text-gray-900 transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-gray-900 transition-colors">Privacy</Link>
+            <Link to="/legal#data-deletion" className="hover:text-gray-900 transition-colors">Data deletion</Link>
             <Link to="/login" className="hover:text-gray-900 transition-colors">Log in</Link>
           </div>
           <p className="text-sm text-gray-400">© {new Date().getFullYear()} ORCIID</p>

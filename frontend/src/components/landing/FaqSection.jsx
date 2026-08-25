@@ -53,7 +53,7 @@ export default function FaqSection() {
 
   return (
     <section id="faq" className="px-4 pb-20">
-      <div className="relative max-w-6xl mx-auto overflow-hidden rounded-3xl px-6 py-16 sm:py-20 bg-[linear-gradient(160deg,#5B53FF_0%,#632CDA_45%,#2C2953_100%)]">
+      <div className="relative max-w-6xl mx-auto overflow-hidden rounded-3xl px-5 sm:px-8 py-12 bg-[linear-gradient(160deg,#5B53FF_0%,#632CDA_45%,#2C2953_100%)]">
         {/* star field */}
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
           {stars.map(([left, top, size], i) => (
@@ -69,32 +69,32 @@ export default function FaqSection() {
           <span className="inline-flex items-center rounded-full border border-white/30 px-4 py-1.5 text-xs font-semibold text-white/90">
             Support questions
           </span>
-          <h2 className="mt-6 text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-white leading-[1.25] tracking-tight">
+          <h2 className="mt-4 text-2xl sm:text-3xl font-bold text-white leading-snug tracking-tight">
             Everything you need to know
             <br className="hidden sm:block" /> about ORCIID Social
           </h2>
         </div>
 
-        <div className="relative mt-10 max-w-3xl mx-auto space-y-3">
+        <div className="relative mt-8 max-w-2xl mx-auto space-y-2">
           {faqs.map(({ q, a }, i) => {
             const isOpen = open === i;
             return (
-              <div key={q} className="rounded-2xl bg-white overflow-hidden">
+              <div key={q} className="rounded-xl bg-white overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? -1 : i)}
                   aria-expanded={isOpen}
-                  className="w-full flex items-center gap-4 text-left px-5 py-4 hover:bg-gray-50/70 transition-colors"
+                  className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-gray-50/70 transition-colors"
                 >
-                  <span className="flex-1 font-semibold text-gray-900 text-sm sm:text-base">
+                  <span className="flex-1 font-semibold text-gray-900 text-sm">
                     {i + 1}. {q}
                   </span>
                   <span className="shrink-0 text-primary-600">
-                    {isOpen ? <MinusIcon className="w-5 h-5" /> : <PlusIcon className="w-5 h-5" />}
+                    {isOpen ? <MinusIcon className="w-4 h-4" /> : <PlusIcon className="w-4 h-4" />}
                   </span>
                 </button>
                 {isOpen && (
-                  <p className="px-5 pb-5 -mt-1 text-sm text-gray-500 leading-relaxed">{a}</p>
+                  <p className="px-4 pb-4 -mt-0.5 text-[13px] text-gray-500 leading-relaxed">{a}</p>
                 )}
               </div>
             );

@@ -1,8 +1,11 @@
+import { useEffect, useRef, useState } from 'react';
 import { PLATFORM_LOGOS } from '../../utils/platforms';
 
-/* Three miniatures of the real product, shown in a continuously scrolling row.
-   Each is a plain-CSS rendering (no screenshots) so it stays crisp and weighs
-   nothing. Kept deliberately readable at ~620px wide. */
+/* Three miniatures of the real product. The row slides sideways as the page
+   scrolls through this section (the section is taller than the viewport and the
+   inner panel sticks), ending on a short statement — so the movement is driven
+   by the reader rather than a timer. Each screen is plain CSS, not a
+   screenshot, so it stays crisp and weighs nothing. */
 
 const Frame = ({ label, children }) => (
   <div className="w-[560px] sm:w-[620px] shrink-0 rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-900/5 overflow-hidden">
@@ -183,36 +186,81 @@ const ScreenSet = () => (
   </>
 );
 
-export default function ProductShowcase() {
-  return (
-    <section className="py-20 lg:py-24 overflow-hidden">
-      <div className="max-w-3xl mx-auto px-4 text-center">
-        <span className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600">
-          Tools that power your workflow
-        </span>
-        <h2 className="mt-6 text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-gray-900 leading-[1.25] tracking-tight">
-          One workspace for planning,
-          <br className="hidden sm:block" /> publishing and{' '}
-          <span className="text-primary-600">proving the results</span>
-        </h2>
-        <p className="mt-5 text-lg text-gray-500">
-          The same screens your team works in every day — analytics, the content calendar, and the overview.
-        </p>
-      </div>
+/* Closing statement that rides at the end of the track, like the reference. */
+const ClosingPanel = () => (
+  <div className="w-[520px] shrink-0 flex items-center px-10">
+    <p className="text-xl sm:text-2xl text-gray-500 leading-relaxed">
+      As your brand grows, the number of accounts grows with it.
+      <span className="text-gray-900 font-semibold"> ORCIID scales with you</span> —
+      add channels, invite teammates and hand off approvals without changing how
+      you work.
+    </p>
+  </div>
+);
 
-      {/* Auto-scrolling row. Both halves are identical, so translating the
-          track by -50% lands exactly on the start of the second copy. */}
-      <div className="marquee-viewport relative mt-14">
-        <div className="marquee-track">
-          <div className="flex gap-6 pr-6">
-            <ScreenSet />
-          </div>
-          <div className="flex gap-6 pr-6" aria-hidden="true">
-            <ScreenSet />
-          </div>
+export default function ProductShowcase() {
+  const sectionRef = useRef(null);
+  const trackRef = useRef(null);
+  const [shift, setShift] = useState(0);
+
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pinned = window.matchMedia('(min-width: 1024px)').matches;
+    if (reduced || !pinned) return; // small screens scroll the row natively
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const section = sectionRef.current;
+      const track = trackRef.current;
+      if (!section || !track) return;
+      const travel = Math.max(0, track.scrollWidth - window.innerWidth + 48);
+      const distance = section.offsetHeight - window.innerHeight;
+      const progress = distance <= 0 ? 0 : (window.scrollY - section.offsetTop) / distance;
+      setShift(Math.min(1, Math.max(0, progress)) * travel);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  return (
+    <section ref={sectionRef} className="lg:h-[280vh]">
+      <div className="lg:sticky lg:top-0 lg:h-screen flex flex-col justify-center py-20 lg:py-0 overflow-hidden">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <span className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600">
+            Tools that power your workflow
+          </span>
+          <h2 className="mt-6 text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-gray-900 leading-[1.25] tracking-tight">
+            One workspace for planning,
+            <br className="hidden sm:block" /> publishing and{' '}
+            <span className="text-primary-600">proving the results</span>
+          </h2>
         </div>
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-white to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-white to-transparent" />
+
+        {/* The row itself. On large screens it is moved by scroll position; on
+            small screens it stays a plain horizontal scroller. */}
+        <div className="relative mt-12 lg:mt-14 overflow-x-auto lg:overflow-visible">
+          <div
+            ref={trackRef}
+            className="flex gap-6 px-4 lg:px-10 w-max will-change-transform"
+            style={{ transform: `translate3d(-${shift}px,0,0)` }}
+          >
+            <ScreenSet />
+            <ClosingPanel />
+          </div>
+          <div className="hidden lg:block pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-white to-transparent" />
+          <div className="hidden lg:block pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-white to-transparent" />
+        </div>
       </div>
     </section>
   );

@@ -179,6 +179,18 @@ function OverviewScreen() {
   );
 }
 
+/* Closing statement, pulled into view as the strip closes up. */
+const ClosingPanel = () => (
+  <div className="w-[420px] shrink-0 flex items-center px-8">
+    <p className="text-lg sm:text-xl text-gray-500 leading-relaxed">
+      As your brand grows, the number of accounts grows with it.
+      <span className="text-gray-900 font-semibold"> ORCIID scales with you</span> —
+      add channels, invite teammates and hand off approvals without changing how
+      you work.
+    </p>
+  </div>
+);
+
 /* The screens don't sit side by side — as you scroll they slide over one
    another, each tucking on top of the one before it, until the closing
    statement is pulled into view. Panel i is shifted left by i x OVERLAP, so the

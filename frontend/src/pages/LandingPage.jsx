@@ -169,15 +169,15 @@ export default function LandingPage() {
             </Reveal>
 
             <h1 className="mt-6 text-4xl sm:text-5xl lg:text-[3.4rem] font-bold text-gray-900 leading-[1.08] tracking-tight">
-              <RevealWords immediate start={120} text="Where brands and audiences connect" highlight="audiences" />
+              <RevealWords immediate start={260} step={135} text="Where brands and audiences connect" highlight="audiences" />
             </h1>
 
-            <Reveal immediate delay={520} as="p" className="mt-6 text-lg text-gray-500 leading-relaxed max-w-xl">
+            <Reveal immediate delay={820} as="p" className="mt-6 text-lg text-gray-500 leading-relaxed max-w-xl">
               Plan, publish and measure across every network from one dashboard —
               with as many accounts per platform as your brand actually runs.
             </Reveal>
 
-            <Reveal immediate delay={640} className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
+            <Reveal immediate delay={1000} className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
               <Link
                 to="/register"
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 hover:bg-primary-700 text-white font-semibold px-7 py-3.5 text-base transition-colors"
@@ -193,7 +193,7 @@ export default function LandingPage() {
               </Link>
             </Reveal>
 
-            <Reveal immediate delay={760} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
+            <Reveal immediate delay={1150} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
               <span className="inline-flex items-center gap-1.5">
                 <CheckIcon className="w-4 h-4 text-primary-600" /> Multiple accounts per platform
               </span>
@@ -207,7 +207,7 @@ export default function LandingPage() {
           </div>
 
           {/* Product visual */}
-          <Reveal immediate delay={300} className="relative lg:pl-6">
+          <Reveal immediate delay={120} className="relative lg:pl-6">
             <DashboardMock />
             {/* floating confirmation card */}
             <div className="hidden sm:flex absolute -bottom-6 -left-2 lg:left-2 items-center gap-3 rounded-2xl bg-white border border-gray-100 shadow-xl shadow-gray-900/5 px-4 py-3">

@@ -54,7 +54,7 @@ export default function FaqSection() {
 
   return (
     <section id="faq" className="px-4 pb-20">
-      <div className="relative max-w-6xl mx-auto overflow-hidden rounded-3xl px-5 sm:px-8 py-12 bg-[linear-gradient(160deg,#5B53FF_0%,#632CDA_45%,#2C2953_100%)]">
+      <div className="relative max-w-6xl mx-auto overflow-hidden rounded-3xl px-4 sm:px-6 py-9 bg-[linear-gradient(160deg,#5B53FF_0%,#632CDA_45%,#2C2953_100%)]">
         {/* star field */}
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
           {stars.map(([left, top, size], i) => (
@@ -67,35 +67,35 @@ export default function FaqSection() {
         </div>
 
         <Reveal className="relative text-center">
-          <span className="inline-flex items-center rounded-full border border-white/30 px-4 py-1.5 text-xs font-semibold text-white/90">
+          <span className="inline-flex items-center rounded-full border border-white/30 px-3 py-1 text-[11px] font-semibold text-white/90">
             Support questions
           </span>
-          <h2 className="mt-4 text-2xl sm:text-3xl font-bold text-white leading-snug tracking-tight">
+          <h2 className="mt-3 text-xl sm:text-2xl font-bold text-white leading-snug tracking-tight">
             Everything you need to know
             <br className="hidden sm:block" /> about ORCIID Social
           </h2>
         </Reveal>
 
-        <div className="relative mt-8 max-w-2xl mx-auto space-y-2">
+        <div className="relative mt-6 max-w-xl mx-auto space-y-1.5">
           {faqs.map(({ q, a }, i) => {
             const isOpen = open === i;
             return (
-              <Reveal key={q} delay={i * 60} className="rounded-xl bg-white overflow-hidden">
+              <Reveal key={q} delay={i * 60} className="rounded-lg bg-white overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? -1 : i)}
                   aria-expanded={isOpen}
-                  className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-gray-50/70 transition-colors"
+                  className="w-full flex items-center gap-3 text-left px-3.5 py-2.5 hover:bg-gray-50/70 transition-colors"
                 >
-                  <span className="flex-1 font-semibold text-gray-900 text-sm">
+                  <span className="flex-1 font-semibold text-gray-900 text-[13px]">
                     {i + 1}. {q}
                   </span>
                   <span className="shrink-0 text-primary-600">
-                    {isOpen ? <MinusIcon className="w-4 h-4" /> : <PlusIcon className="w-4 h-4" />}
+                    {isOpen ? <MinusIcon className="w-3.5 h-3.5" /> : <PlusIcon className="w-3.5 h-3.5" />}
                   </span>
                 </button>
                 {isOpen && (
-                  <p className="px-4 pb-4 -mt-0.5 text-[13px] text-gray-500 leading-relaxed">{a}</p>
+                  <p className="px-3.5 pb-3.5 -mt-0.5 text-xs text-gray-500 leading-relaxed">{a}</p>
                 )}
               </Reveal>
             );

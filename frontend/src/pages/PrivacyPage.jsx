@@ -178,10 +178,7 @@ export default function PrivacyPage() {
       <nav className="border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">O</span>
-            </div>
-            <span className="font-bold text-gray-900 text-lg">Orciid Social</span>
+            <img src="/brand/orciid-wordmark-black.png" alt="ORCIID" className="h-5 w-auto" draggable="false" />
           </Link>
           <Link to="/" className="text-sm font-medium text-primary-600 hover:text-primary-700">← Back to home</Link>
         </div>

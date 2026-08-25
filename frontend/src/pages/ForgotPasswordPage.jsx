@@ -23,10 +23,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold">O</span>
-            </div>
-            <span className="font-bold text-gray-900 text-xl">Orciid Social</span>
+            <img src="/brand/orciid-wordmark-black.png" alt="ORCIID" className="h-6 w-auto" draggable="false" />
           </Link>
         </div>
         <div className="card p-8">

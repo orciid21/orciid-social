@@ -57,3 +57,47 @@
 .platform-linkedin { background-color: #0A66C2; }
 .platform-tiktok { background-color: #000; }
 .platform-youtube { background-color: #FF0000; }
+
+/* Entrance motion. Elements start blurred, transparent and a little low, then
+   settle as they come into view — staggered so a group resolves one item at a
+   time. Anyone who prefers reduced motion just gets the finished state. */
+.reveal-ready .reveal {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(14px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+    filter 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal-ready .reveal.is-visible {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+}
+/* Word-level variant for headlines — same feel, tighter travel. */
+.reveal-word { display: inline-block; }
+.reveal-ready .reveal-word {
+  opacity: 0;
+  filter: blur(12px);
+  transform: translateY(10px);
+  transition:
+    opacity 0.65s cubic-bezier(0.22, 0.61, 0.36, 1),
+    filter 0.65s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.65s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal-ready .reveal-word.is-visible {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-ready .reveal, .reveal-ready .reveal-word {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    transition: none;
+  }
+}

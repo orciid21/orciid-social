@@ -6,6 +6,7 @@ import {
 import { PLATFORM_LOGOS } from '../utils/platforms';
 import ProductShowcase from '../components/landing/ProductShowcase';
 import FaqSection from '../components/landing/FaqSection';
+import { Reveal, RevealWords } from '../components/landing/Reveal';
 
 // Accent colours come from the ORCIID brand palette (Cobalt / Iris / Electric / Coral).
 const features = [
@@ -162,26 +163,21 @@ export default function LandingPage() {
 
         <div className="max-w-6xl mx-auto px-4 pt-16 pb-20 lg:pt-24 lg:pb-28 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
-            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/80 border border-primary-100 rounded-full text-primary-700 text-xs font-semibold">
+            <Reveal immediate as="span" className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/80 border border-primary-100 rounded-full text-primary-700 text-xs font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-primary-600" />
               7-day free trial — no credit card
-            </span>
+            </Reveal>
 
             <h1 className="mt-6 text-4xl sm:text-5xl lg:text-[3.4rem] font-bold text-gray-900 leading-[1.08] tracking-tight">
-              Where brands and{' '}
-              <span className="relative inline-block">
-                <span aria-hidden className="absolute inset-x-[-0.15em] inset-y-[0.08em] bg-primary-100 rounded-lg" />
-                <span className="relative text-primary-700">audiences</span>
-              </span>{' '}
-              connect
+              <RevealWords immediate start={120} text="Where brands and audiences connect" highlight="audiences" />
             </h1>
 
-            <p className="mt-6 text-lg text-gray-500 leading-relaxed max-w-xl">
+            <Reveal immediate delay={520} as="p" className="mt-6 text-lg text-gray-500 leading-relaxed max-w-xl">
               Plan, publish and measure across every network from one dashboard —
               with as many accounts per platform as your brand actually runs.
-            </p>
+            </Reveal>
 
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
+            <Reveal immediate delay={640} className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
               <Link
                 to="/register"
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 hover:bg-primary-700 text-white font-semibold px-7 py-3.5 text-base transition-colors"
@@ -195,9 +191,9 @@ export default function LandingPage() {
               >
                 See pricing
               </Link>
-            </div>
+            </Reveal>
 
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
+            <Reveal immediate delay={760} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
               <span className="inline-flex items-center gap-1.5">
                 <CheckIcon className="w-4 h-4 text-primary-600" /> Multiple accounts per platform
               </span>
@@ -207,11 +203,11 @@ export default function LandingPage() {
               <span className="inline-flex items-center gap-1.5">
                 <ClockIcon className="w-4 h-4 text-primary-600" /> Auto-scheduling
               </span>
-            </div>
+            </Reveal>
           </div>
 
           {/* Product visual */}
-          <div className="relative lg:pl-6">
+          <Reveal immediate delay={300} className="relative lg:pl-6">
             <DashboardMock />
             {/* floating confirmation card */}
             <div className="hidden sm:flex absolute -bottom-6 -left-2 lg:left-2 items-center gap-3 rounded-2xl bg-white border border-gray-100 shadow-xl shadow-gray-900/5 px-4 py-3">
@@ -223,23 +219,24 @@ export default function LandingPage() {
                 <div className="text-[11px] text-gray-500">a few seconds ago</div>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Platforms strip */}
       <section className="border-y border-gray-100 bg-gray-50/60">
         <div className="max-w-6xl mx-auto px-4 py-10 text-center">
-          <p className="text-sm font-medium text-gray-500">Publish everywhere your audience already is</p>
+          <Reveal as="p" className="text-sm font-medium text-gray-500">Publish everywhere your audience already is</Reveal>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-8 sm:gap-12">
-            {platformOrder.map((p) => (
+            {platformOrder.map((p, i) => (
+              <Reveal key={p} delay={i * 70} as="span" className="inline-block">
               <img
-                key={p}
                 src={PLATFORM_LOGOS[p]}
                 alt={p}
                 title={p}
                 className="h-8 w-8 object-contain opacity-70 hover:opacity-100 transition-opacity"
               />
+              </Reveal>
             ))}
           </div>
         </div>
@@ -248,19 +245,20 @@ export default function LandingPage() {
       {/* Features */}
       <section id="features" className="py-20 lg:py-24 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
               Everything you need to run social properly
             </h2>
             <p className="mt-4 text-lg text-gray-500">
               Built for brands and agencies juggling more than one account — and more than one client.
             </p>
-          </div>
+          </Reveal>
 
           <div className="mt-12 grid sm:grid-cols-2 gap-5">
-            {features.map(({ icon: Icon, title, desc, tint }) => (
-              <div
+            {features.map(({ icon: Icon, title, desc, tint }, i) => (
+              <Reveal
                 key={title}
+                delay={i * 100}
                 className="rounded-2xl border border-gray-100 bg-white p-6 hover:border-primary-200 hover:shadow-lg hover:shadow-primary-900/5 transition-all"
               >
                 <span className={`inline-flex w-11 h-11 rounded-xl items-center justify-center ${tint}`}>
@@ -268,7 +266,7 @@ export default function LandingPage() {
                 </span>
                 <h3 className="mt-4 font-semibold text-gray-900 text-lg">{title}</h3>
                 <p className="mt-2 text-gray-500 text-sm leading-relaxed">{desc}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -279,17 +277,17 @@ export default function LandingPage() {
       {/* How it works */}
       <section id="how" className="py-20 lg:py-24 px-4 bg-gray-50/70 border-y border-gray-100">
         <div className="max-w-6xl mx-auto">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Up and running in three steps</h2>
             <p className="mt-4 text-lg text-gray-500">No migration, no setup calls. Connect and publish the same day.</p>
-          </div>
+          </Reveal>
           <div className="mt-12 grid md:grid-cols-3 gap-5">
-            {steps.map(({ n, title, desc }) => (
-              <div key={n} className="rounded-2xl bg-white border border-gray-100 p-6">
+            {steps.map(({ n, title, desc }, i) => (
+              <Reveal key={n} delay={i * 100} className="rounded-2xl bg-white border border-gray-100 p-6">
                 <span className="text-sm font-bold text-primary-600">{n}</span>
                 <h3 className="mt-3 font-semibold text-gray-900 text-lg">{title}</h3>
                 <p className="mt-2 text-sm text-gray-500 leading-relaxed">{desc}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -298,14 +296,15 @@ export default function LandingPage() {
       {/* Pricing */}
       <section id="pricing" className="py-20 lg:py-24 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
+          <Reveal className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Simple, transparent pricing</h2>
             <p className="mt-4 text-lg text-gray-500">Start free for 7 days. Cancel anytime.</p>
-          </div>
+          </Reveal>
           <div className="grid md:grid-cols-3 gap-6">
-            {plans.map((plan) => (
-              <div
+            {plans.map((plan, i) => (
+              <Reveal
                 key={plan.name}
+                delay={i * 100}
                 className={`rounded-2xl bg-white p-6 relative ${
                   plan.popular
                     ? 'border-2 border-primary-600 shadow-xl shadow-primary-900/10'
@@ -344,7 +343,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -354,7 +353,7 @@ export default function LandingPage() {
 
       {/* CTA */}
       <section className="px-4 pb-20">
-        <div className="max-w-6xl mx-auto rounded-3xl bg-brand-gradient px-6 py-16 text-center">
+        <Reveal className="max-w-6xl mx-auto rounded-3xl bg-brand-gradient px-6 py-16 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Ready when you are</h2>
           <p className="mt-4 text-white/85 text-lg max-w-xl mx-auto">
             Connect your first channel in under a minute and schedule today&apos;s post before your coffee gets cold.
@@ -366,7 +365,7 @@ export default function LandingPage() {
             Start your free trial
             <ArrowRightIcon className="w-4 h-4" />
           </Link>
-        </div>
+        </Reveal>
       </section>
 
       {/* Footer */}

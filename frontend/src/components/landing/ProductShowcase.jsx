@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { PLATFORM_LOGOS } from '../../utils/platforms';
+import { Reveal } from './Reveal';
 
 /* Three miniatures of the real product. The row slides sideways as the page
    scrolls through this section (the section is taller than the viewport and the
@@ -236,7 +237,7 @@ export default function ProductShowcase() {
   return (
     <section ref={sectionRef} className="lg:h-[280vh]">
       <div className="lg:sticky lg:top-0 lg:h-screen flex flex-col justify-center py-20 lg:py-0 lg:pt-16 overflow-hidden">
-        <div className="max-w-3xl mx-auto px-4 text-center">
+        <Reveal className="max-w-3xl mx-auto px-4 text-center">
           <span className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600">
             Tools that power your workflow
           </span>
@@ -245,7 +246,7 @@ export default function ProductShowcase() {
             <br className="hidden sm:block" /> publishing and{' '}
             <span className="text-primary-600">proving the results</span>
           </h2>
-        </div>
+        </Reveal>
 
         {/* The row itself. On large screens it is moved by scroll position; on
             small screens it stays a plain horizontal scroller. */}

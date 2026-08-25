@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { Reveal } from './Reveal';
 
 /* Questions mirror what people actually ask social tools (channels, trials,
    billing, collaboration); the answers are ORCIID's own and describe only
@@ -65,7 +66,7 @@ export default function FaqSection() {
           ))}
         </div>
 
-        <div className="relative text-center">
+        <Reveal className="relative text-center">
           <span className="inline-flex items-center rounded-full border border-white/30 px-4 py-1.5 text-xs font-semibold text-white/90">
             Support questions
           </span>
@@ -73,13 +74,13 @@ export default function FaqSection() {
             Everything you need to know
             <br className="hidden sm:block" /> about ORCIID Social
           </h2>
-        </div>
+        </Reveal>
 
         <div className="relative mt-8 max-w-2xl mx-auto space-y-2">
           {faqs.map(({ q, a }, i) => {
             const isOpen = open === i;
             return (
-              <div key={q} className="rounded-xl bg-white overflow-hidden">
+              <Reveal key={q} delay={i * 60} className="rounded-xl bg-white overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? -1 : i)}
@@ -96,7 +97,7 @@ export default function FaqSection() {
                 {isOpen && (
                   <p className="px-4 pb-4 -mt-0.5 text-[13px] text-gray-500 leading-relaxed">{a}</p>
                 )}
-              </div>
+              </Reveal>
             );
           })}
         </div>

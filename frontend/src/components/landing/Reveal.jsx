@@ -32,9 +32,20 @@ function useInView(immediate) {
       setShown(true);
       return undefined;
     }
+    // Anything already on screen at mount resolves right away, without waiting
+    // for an observer callback.
+    const rect = node.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.9 && rect.bottom > 0) {
+      const id = setTimeout(() => setShown(true), 30);
+      return () => clearTimeout(id);
+    }
+    // Safety net: if the observer never reports (a background tab defers its
+    // callbacks, for one), show the content anyway rather than leaving a hole.
+    const fallback = setTimeout(() => setShown(true), 2500);
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
+          clearTimeout(fallback);
           setShown(true);
           io.disconnect();
         }
@@ -42,7 +53,10 @@ function useInView(immediate) {
       { rootMargin: '0px 0px -12% 0px', threshold: 0.1 }
     );
     io.observe(node);
-    return () => io.disconnect();
+    return () => {
+      clearTimeout(fallback);
+      io.disconnect();
+    };
   }, [immediate, shown]);
 
   return [ref, shown];

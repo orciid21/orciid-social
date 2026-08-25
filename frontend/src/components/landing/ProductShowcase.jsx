@@ -259,7 +259,9 @@ export default function ProductShowcase() {
                   <Screen />
                 </div>
               ))}
-              <div className="relative" style={{ marginLeft: slide(1), zIndex: SCREENS.length + 1 }}>
+              {/* The statement follows the strip rather than joining the
+                  stack — overlapping it would put text on top of a screen. */}
+              <div className="relative" style={{ zIndex: SCREENS.length + 1 }}>
                 <ClosingPanel />
               </div>
             </div>

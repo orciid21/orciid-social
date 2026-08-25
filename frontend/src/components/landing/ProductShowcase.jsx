@@ -235,7 +235,7 @@ export default function ProductShowcase() {
 
   return (
     <section ref={sectionRef} className="lg:h-[280vh]">
-      <div className="lg:sticky lg:top-0 lg:h-screen flex flex-col justify-center py-20 lg:py-0 overflow-hidden">
+      <div className="lg:sticky lg:top-0 lg:h-screen flex flex-col justify-center py-20 lg:py-0 lg:pt-16 overflow-hidden">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <span className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600">
             Tools that power your workflow

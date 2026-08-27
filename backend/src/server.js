@@ -77,7 +77,46 @@ const PENDING_COLUMNS = [
     column: 'fbConnectToken',
     ddl: 'ALTER TABLE `User` ADD COLUMN `fbConnectToken` TEXT NULL',
   },
+  {
+    table: 'SocialAccount',
+    column: 'projectId',
+    ddl: 'ALTER TABLE `SocialAccount` ADD COLUMN `projectId` VARCHAR(191) NULL',
+  },
 ];
+
+// New tables are created here for the same reason columns are: the `prisma` CLI
+// is a devDependency and never runs in production, so `prisma db push` cannot
+// create them. CREATE TABLE IF NOT EXISTS is idempotent, so this is safe on
+// every boot. The foreign key is added separately and tolerated if it already
+// exists, because MySQL has no "ADD CONSTRAINT IF NOT EXISTS".
+const PENDING_TABLES = [
+  {
+    table: 'Project',
+    ddl:
+      'CREATE TABLE IF NOT EXISTS `Project` (' +
+      '`id` VARCHAR(191) NOT NULL,' +
+      '`workspaceId` VARCHAR(191) NOT NULL,' +
+      '`name` VARCHAR(191) NOT NULL,' +
+      '`color` VARCHAR(191) NULL,' +
+      '`createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),' +
+      '`updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),' +
+      'PRIMARY KEY (`id`),' +
+      'UNIQUE KEY `Project_workspaceId_name_key` (`workspaceId`, `name`),' +
+      'KEY `Project_workspaceId_idx` (`workspaceId`)' +
+      ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+  },
+];
+
+const ensureTables = async () => {
+  for (const { table, ddl } of PENDING_TABLES) {
+    try {
+      await prismaClient.$executeRawUnsafe(ddl);
+      write(`Table ${table} ensured`);
+    } catch (err) {
+      write(`ensureTables error for ${table}: ` + (err.message || err));
+    }
+  }
+};
 
 const ensureColumns = async () => {
   for (const { table, column, ddl } of PENDING_COLUMNS) {
@@ -230,6 +269,7 @@ const startDbMonitor = () => {
 write('Starting server immediately; DB verification runs in background...');
 startServer();
 verifyDatabaseInBackground()
+  .then(ensureTables)
   .then(ensureColumns)
   .then(ensurePlatformEnum)
   .then(fixupFacebookAvatars)

@@ -61,8 +61,27 @@ model Workspace {
 
   members     WorkspaceMember[]
   accounts    SocialAccount[]
+  projects    Project[]
   posts       Post[]
   invitations Invitation[]
+}
+
+// A Project is a client or brand inside a workspace: its own set of connected
+// channels, so an agency running several brands can't accidentally publish one
+// brand's post to another. The team (WorkspaceMember) stays shared across all
+// projects — you invite a colleague once, not once per client.
+model Project {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  accounts  SocialAccount[]
+
+  @@unique([workspaceId, name])
 }
 
 // Pending team invitations. When the invited email belongs to an existing user
@@ -99,6 +118,7 @@ model SocialAccount {
   id           String         @id @default(uuid())
   userId       String
   workspaceId  String?
+  projectId    String?
   platform     Platform
   platformId   String
   name         String
@@ -113,6 +133,7 @@ model SocialAccount {
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  project   Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   posts     PostAccount[]
 
   @@unique([userId, platform, platformId])

@@ -41,6 +41,9 @@ const friendlyOAuthError = (error) =>
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -87,6 +90,7 @@ export default function AccountsPage() {
     // After Facebook OAuth, let the user choose which Page(s) to connect.
     if (searchParams.get('select') === 'facebook') openFacebookPicker();
     fetchAccounts();
+    fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -157,6 +161,42 @@ export default function AccountsPage() {
       toast.error(err.response?.data?.error || 'Failed to connect Pages');
     } finally {
       setFbSaving(false);
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const res = await api.get('/projects');
+      setProjects(res.data.projects || []);
+    } catch {
+      /* projects are optional — the page still works without them */
+    }
+  };
+
+  const createProject = async (e) => {
+    e.preventDefault();
+    const name = newProjectName.trim();
+    if (!name) return;
+    try {
+      setCreatingProject(true);
+      await api.post('/projects', { name });
+      setNewProjectName('');
+      await fetchProjects();
+      toast.success('Project created');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not create the project');
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
+  const assignChannel = async (accountId, projectId) => {
+    try {
+      await api.put(`/projects/channels/${accountId}`, { projectId: projectId || null });
+      setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, projectId: projectId || null } : a)));
+      fetchProjects();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not move the channel');
     }
   };
 
@@ -264,6 +304,47 @@ export default function AccountsPage() {
         <p className="text-gray-500 text-sm mt-1">Connect one or more accounts per platform to start publishing</p>
       </div>
 
+      {/* Projects — a client or brand, holding its own channels. Grouping them
+          here is what stops one brand's post going out on another's channel. */}
+      <div className="card">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">Projects</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Group each client or brand&apos;s channels together. Your team stays shared across all of them.
+          </p>
+        </div>
+
+        <div className="px-5 py-4">
+          <form onSubmit={createProject} className="flex gap-2">
+            <input
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              placeholder="New project name — e.g. Lamsa"
+              className="input flex-1"
+            />
+            <button type="submit" disabled={creatingProject || !newProjectName.trim()} className="btn-primary text-sm">
+              <PlusIcon className="w-4 h-4" />
+              {creatingProject ? 'Adding…' : 'Add project'}
+            </button>
+          </form>
+
+          {projects.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {projects.map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-2 rounded-full bg-gray-50 border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700"
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color || '#5B53FF' }} />
+                  {p.name}
+                  <span className="text-gray-400">{p.accounts?.length ?? 0}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* One card per platform: the account(s) already connected on it, plus an
           explicit "Add another" button so multiple accounts per platform are
           obviously supported (e.g. several Instagram accounts or Facebook Pages). */}
@@ -307,6 +388,19 @@ export default function AccountsPage() {
                         <p className="font-medium text-gray-900 text-sm truncate">{acc.name}</p>
                         <p className="text-xs text-gray-500 truncate">{acc.username ? `@${acc.username}` : 'Connected'}</p>
                       </div>
+                      {projects.length > 0 && (
+                        <select
+                          value={acc.projectId || ''}
+                          onChange={(e) => assignChannel(acc.id, e.target.value)}
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 bg-white flex-shrink-0"
+                          title="Which project does this channel belong to?"
+                        >
+                          <option value="">No project</option>
+                          {projects.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      )}
                       <button
                         onClick={() => handleDisconnect(acc.id, acc.name)}
                         title="Disconnect"

@@ -18,6 +18,7 @@ const getAccounts = async (req, res, next) => {
         username: true,
         avatar: true,
         isActive: true,
+        projectId: true,
         createdAt: true,
       },
     });

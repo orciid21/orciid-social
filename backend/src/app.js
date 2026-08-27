@@ -16,6 +16,7 @@ const workspaceRoutes = require('./routes/workspace.routes');
 const oauthRoutes = require('./routes/oauth.routes');
 const adminRoutes = require('./routes/admin.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const projectRoutes = require('./routes/project.routes');
 
 const { errorHandler } = require('./middleware/error.middleware');
 
@@ -80,6 +81,7 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/projects', projectRoutes);
 app.use('/auth', oauthRoutes); // OAuth callbacks
 app.use('/api/admin', adminRoutes);
 

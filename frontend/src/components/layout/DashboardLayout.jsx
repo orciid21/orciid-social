@@ -24,6 +24,9 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [unassigned, setUnassigned] = useState([]);
+  const [openProjects, setOpenProjects] = useState({});
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [composeOpen, setComposeOpen] = useState(false);
   const { user, logout } = useAuthStore();
@@ -31,6 +34,17 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     api.get('/social').then((res) => setAccounts(res.data)).catch(() => {});
+    api
+      .get('/projects')
+      .then((res) => {
+        const list = res.data.projects || [];
+        setProjects(list);
+        setUnassigned(res.data.unassigned || []);
+        // Start with everything expanded — the point of projects is seeing
+        // which channels belong to which client at a glance.
+        setOpenProjects(Object.fromEntries(list.map((p) => [p.id, true])));
+      })
+      .catch(() => {});
   }, []);
 
   const handleLogout = () => {
@@ -150,34 +164,88 @@ export default function DashboardLayout() {
             </NavLink>
           )}
 
-          {/* Channels */}
+          {/* Projects — each client's channels grouped together */}
           <div className="mt-4 pt-3 border-t border-gray-100">
             <button
               onClick={() => setChannelsOpen((v) => !v)}
               className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-gray-600"
             >
-              <span>Channels</span>
+              <span>Projects</span>
               <ChevronDownIcon className={`w-4 h-4 transition-transform ${channelsOpen ? '' : '-rotate-90'}`} />
             </button>
 
             {channelsOpen && (
-              <div className="mt-1 space-y-0.5">
-                {accounts.map((acc) => (
-                  <button
-                    key={acc.id}
-                    onClick={() => navigate('/channel/' + acc.id)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
-                  >
-                    <ChannelAvatar account={acc} size="w-7 h-7" badge="w-3.5 h-3.5" rounded="rounded-md" />
-                    <span className="flex-1 min-w-0 text-sm text-gray-700 truncate">{acc.name}</span>
-                  </button>
-                ))}
+              <div className="mt-1 space-y-1">
+                {projects.map((project) => {
+                  const expanded = openProjects[project.id];
+                  return (
+                    <div key={project.id}>
+                      <button
+                        onClick={() =>
+                          setOpenProjects((prev) => ({ ...prev, [project.id]: !prev[project.id] }))
+                        }
+                        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: project.color || '#5B53FF' }}
+                        />
+                        <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate">
+                          {project.name}
+                        </span>
+                        <span className="text-[11px] text-gray-400">{project.accounts.length}</span>
+                        <ChevronDownIcon
+                          className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
+                        />
+                      </button>
+
+                      {expanded && (
+                        <div className="ml-3 pl-2 border-l border-gray-100 space-y-0.5">
+                          {project.accounts.map((acc) => (
+                            <button
+                              key={acc.id}
+                              onClick={() => navigate('/channel/' + acc.id)}
+                              className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 text-left"
+                            >
+                              <ChannelAvatar account={acc} size="w-6 h-6" badge="w-3 h-3" rounded="rounded-md" />
+                              <span className="flex-1 min-w-0 text-[13px] text-gray-600 truncate">{acc.name}</span>
+                            </button>
+                          ))}
+                          {project.accounts.length === 0 && (
+                            <p className="px-2 py-1.5 text-[12px] text-gray-400">No channels yet</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Channels not yet filed under a project */}
+                {unassigned.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                      Unassigned
+                    </div>
+                    <div className="space-y-0.5">
+                      {unassigned.map((acc) => (
+                        <button
+                          key={acc.id}
+                          onClick={() => navigate('/channel/' + acc.id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
+                        >
+                          <ChannelAvatar account={acc} size="w-7 h-7" badge="w-3.5 h-3.5" rounded="rounded-md" />
+                          <span className="flex-1 min-w-0 text-sm text-gray-700 truncate">{acc.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={() => navigate('/accounts')}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg"
                 >
-                  <PlusIcon className="w-4 h-4" /> Connect channels
+                  <PlusIcon className="w-4 h-4" /> Manage projects & channels
                 </button>
               </div>
             )}

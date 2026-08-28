@@ -1,7 +1,22 @@
 const { PrismaClient } = require('@prisma/client');
 
+// Cap the connection pool. Prisma's default is (CPU cores x 2) + 1, and on a
+// shared host it sees the WHOLE machine's cores — so it opens dozens of
+// connections for an app that needs a handful. That is a large, permanent draw
+// on an account limited to 120 processes. Three is plenty here and leaves room
+// for the app to actually run.
+//
+// Applied to the URL in code rather than to the DATABASE_URL env var, so the
+// credentials stay where they are and this can't be lost by an env edit.
+const poolUrl = (() => {
+  const url = process.env.DATABASE_URL || '';
+  if (!url || url.includes('connection_limit')) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'connection_limit=3&pool_timeout=20';
+})();
+
 const base = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  ...(poolUrl ? { datasources: { db: { url: poolUrl } } } : {}),
 });
 
 // On Hostinger's shared host the Prisma query engine intermittently panics with

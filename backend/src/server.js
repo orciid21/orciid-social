@@ -260,7 +260,11 @@ const startDbMonitor = () => {
       write('DB monitor: probe failed, recycling engine — ' + String(err.message || err).slice(0, 120));
       try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
     }
-  }, 20000);
+    // Every 5 minutes, not every 20 seconds. The old interval fired ~4,300
+    // queries a day purely to watch the connection, which is a meaningful
+    // constant load on a shared host — and it never actually prevented the
+    // panics it was watching for.
+  }, 300000);
 };
 
 // LISTEN FIRST — the platform proxy 503s the whole site if the port doesn't

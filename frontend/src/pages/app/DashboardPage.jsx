@@ -5,7 +5,7 @@ import api from '../../utils/api';
 import {
   DocumentTextIcon, CalendarIcon, CheckCircleIcon,
   LinkIcon, PlusIcon, ArrowTrendingUpIcon, SparklesIcon,
-  ClockIcon, CheckBadgeIcon,
+  ClockIcon, CheckBadgeIcon, ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { PLATFORM_LOGOS } from '../../utils/platforms';
@@ -41,15 +41,21 @@ export default function DashboardPage() {
   const [recentPosts, setRecentPosts] = useState([]);
   const [scheduledPosts, setScheduledPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  // One row per project, so the dashboard answers "how is each client doing?"
+  const [projectRows, setProjectRows] = useState([]);
+  const [unassignedChannels, setUnassignedChannels] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, postsRes, scheduledRes] = await Promise.all([
+        const [statsRes, postsRes, scheduledRes, projectsRes] = await Promise.all([
           api.get('/analytics/overview').catch(() => ({ data: null })),
           api.get('/posts?limit=5').catch(() => ({ data: {} })),
           api.get('/posts?status=SCHEDULED&limit=3').catch(() => ({ data: {} })),
+          api.get('/projects/summary').catch(() => ({ data: {} })),
         ]);
+        setProjectRows(projectsRes.data?.projects || []);
+        setUnassignedChannels(projectsRes.data?.unassignedChannels || 0);
         setStats(statsRes.data || { totalPosts: 0, scheduledPosts: 0, publishedPosts: 0, accountsCount: 0 });
         setRecentPosts(postsRes.data?.posts || []);
         setScheduledPosts(scheduledRes.data?.posts || []);
@@ -180,6 +186,64 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Projects — how each client is doing, and a way straight into it */}
+      {projectRows.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+              <h2 className="font-semibold text-gray-900">Projects</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {projectRows.length} project{projectRows.length === 1 ? '' : 's'} ·{' '}
+                {projectRows.reduce((n, p) => n + p.channelCount, 0)} channels
+                {unassignedChannels > 0 && ` · ${unassignedChannels} unassigned`}
+              </p>
+            </div>
+            <Link to="/accounts" className="text-xs font-medium text-primary-600">Manage</Link>
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {projectRows.map((p) => (
+              <Link
+                key={p.id}
+                to={`/project/${p.id}`}
+                className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: p.color || '#5B53FF' }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 text-sm truncate">{p.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {p.channelCount} channel{p.channelCount === 1 ? '' : 's'} · {p.totalPosts} post
+                    {p.totalPosts === 1 ? '' : 's'}
+                  </p>
+                </div>
+
+                <div className="hidden sm:flex items-center gap-6 text-right">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{p.scheduled}</div>
+                    <div className="text-[11px] text-gray-400">Scheduled</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{p.published}</div>
+                    <div className="text-[11px] text-gray-400">Published</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-primary-600">
+                      {(p.engagement?.total ?? 0).toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-gray-400">Engagement</div>
+                  </div>
+                </div>
+
+                <ArrowRightIcon className="w-4 h-4 text-gray-300 flex-shrink-0" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Chart + Upcoming + Quick Actions */}
       <div className="grid lg:grid-cols-3 gap-5">

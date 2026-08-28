@@ -26,7 +26,6 @@ export default function DashboardLayout() {
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [projects, setProjects] = useState([]);
   const [unassigned, setUnassigned] = useState([]);
-  const [openProjects, setOpenProjects] = useState({});
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [composeOpen, setComposeOpen] = useState(false);
   const { user, logout } = useAuthStore();
@@ -40,9 +39,6 @@ export default function DashboardLayout() {
         const list = res.data.projects || [];
         setProjects(list);
         setUnassigned(res.data.unassigned || []);
-        // Start with everything expanded — the point of projects is seeing
-        // which channels belong to which client at a glance.
-        setOpenProjects(Object.fromEntries(list.map((p) => [p.id, true])));
       })
       .catch(() => {});
   }, []);
@@ -176,15 +172,13 @@ export default function DashboardLayout() {
 
             {channelsOpen && (
               <div className="mt-1 space-y-1">
-                {projects.map((project) => {
-                  const expanded = openProjects[project.id];
-                  return (
+                {projects.map((project) => (
                     <div key={project.id}>
+                      {/* Clicking a project opens its own overview rather than
+                          unfolding a list — the channels live on that page. */}
                       <button
-                        onClick={() =>
-                          setOpenProjects((prev) => ({ ...prev, [project.id]: !prev[project.id] }))
-                        }
-                        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-left"
+                        onClick={() => { setSidebarOpen(false); navigate('/project/' + project.id); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
                       >
                         <span
                           className="w-2 h-2 rounded-full flex-shrink-0"
@@ -194,31 +188,9 @@ export default function DashboardLayout() {
                           {project.name}
                         </span>
                         <span className="text-[11px] text-gray-400">{project.accounts.length}</span>
-                        <ChevronDownIcon
-                          className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
-                        />
                       </button>
-
-                      {expanded && (
-                        <div className="ml-3 pl-2 border-l border-gray-100 space-y-0.5">
-                          {project.accounts.map((acc) => (
-                            <button
-                              key={acc.id}
-                              onClick={() => navigate('/channel/' + acc.id)}
-                              className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 text-left"
-                            >
-                              <ChannelAvatar account={acc} size="w-6 h-6" badge="w-3 h-3" rounded="rounded-md" />
-                              <span className="flex-1 min-w-0 text-[13px] text-gray-600 truncate">{acc.name}</span>
-                            </button>
-                          ))}
-                          {project.accounts.length === 0 && (
-                            <p className="px-2 py-1.5 text-[12px] text-gray-400">No channels yet</p>
-                          )}
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
+                ))}
 
                 {/* Channels not yet filed under a project */}
                 {unassigned.length > 0 && (

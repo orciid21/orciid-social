@@ -21,6 +21,7 @@ import AccountsPage from './pages/app/AccountsPage';
 import AnalyticsPage from './pages/app/AnalyticsPage';
 import PostsPage from './pages/app/PostsPage';
 import ChannelPublishPage from './pages/app/ChannelPublishPage';
+import ProjectOverviewPage from './pages/app/ProjectOverviewPage';
 import SettingsPage from './pages/app/SettingsPage';
 import BillingPage from './pages/app/BillingPage';
 import AdminPage from './pages/admin/AdminPage';
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="posts" element={<PostsPage />} />
         <Route path="channel/:accountId" element={<ChannelPublishPage />} />
+        <Route path="project/:projectId" element={<ProjectOverviewPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="settings" element={<SettingsPage />} />

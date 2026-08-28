@@ -21,6 +21,10 @@ export default function PostsPage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  // Projects scope the list to one client's channels — the same grouping used
+  // in the sidebar and the composer.
+  const [projects, setProjects] = useState([]);
+  const [project, setProject] = useState('ALL');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -36,6 +40,15 @@ export default function PostsPage() {
   };
 
   useEffect(() => { fetchPosts(); }, [filter, page]);
+  useEffect(() => {
+    api.get('/projects').then((r) => setProjects(r.data.projects || [])).catch(() => {});
+  }, []);
+
+  // A post belongs to a project when any of its channels does.
+  const visiblePosts =
+    project === 'ALL'
+      ? posts
+      : posts.filter((p) => p.accounts?.some((pa) => pa.socialAccount?.projectId === project));
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this post?')) return;
@@ -85,11 +98,32 @@ export default function PostsPage() {
         ))}
       </div>
 
+      {projects.length > 0 && (
+        <div className="flex gap-2 flex-wrap -mt-2">
+          {[{ id: 'ALL', name: 'All projects' }, ...projects].map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setProject(p.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+                project === p.id
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {p.id !== 'ALL' && (
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color || '#5B53FF' }} />
+              )}
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Posts list */}
       <div className="card">
         {loading ? (
           <div className="py-12 text-center text-gray-400 text-sm">Loading...</div>
-        ) : posts.length === 0 ? (
+        ) : visiblePosts.length === 0 ? (
           <div className="py-16 text-center">
             <DocumentTextIcon className="w-12 h-12 text-gray-200 mx-auto mb-3" />
             <p className="text-gray-500">No posts found</p>
@@ -99,7 +133,7 @@ export default function PostsPage() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {posts.map((post) => (
+            {visiblePosts.map((post) => (
               <div key={post.id} className="flex items-start gap-4 px-5 py-4">
                 {/* Platform icons */}
                 <div className="flex -space-x-1 flex-shrink-0 mt-0.5">

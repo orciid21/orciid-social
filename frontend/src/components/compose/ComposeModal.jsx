@@ -116,10 +116,11 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
   const [saving, setSaving] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  // Channel groups (created in Settings › Features › Channel Groups, stored in
-  // localStorage). The tab bar above the channels lets you filter to a group.
-  const [groups, setGroups] = useState([]);
-  const [activeGroup, setActiveGroup] = useState('all');
+  // Projects are the real, server-side grouping of channels (a client or brand).
+  // The tab bar above the channels filters to one project, so a post can't
+  // accidentally go out on another client's channels.
+  const [projects, setProjects] = useState([]);
+  const [activeProject, setActiveProject] = useState('all');
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -132,8 +133,11 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
       setScheduledAt('');
       setEmojiOpen(false);
       setDragActive(false);
-      setActiveGroup('all');
-      try { setGroups(JSON.parse(localStorage.getItem('orciid-groups') || '[]')); } catch { setGroups([]); }
+      setActiveProject('all');
+      api
+        .get('/projects')
+        .then((res) => setProjects(res.data.projects || []))
+        .catch(() => setProjects([]));
       setSelectedAccounts(accounts.map((a) => a.id));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,21 +156,19 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
   const toggleAccount = (id) =>
     setSelectedAccounts((prev) => (prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]));
 
-  // Accounts shown for the active group tab: "all" → everything connected;
-  // a group → only the channels that were added to that group (that still exist).
-  const groupAccounts = (groupId) => {
-    if (groupId === 'all') return accounts;
-    const g = groups.find((x) => x.id === groupId);
-    if (!g) return accounts;
-    return accounts.filter((a) => g.channelIds.includes(a.id));
+  // Channels shown for the active tab: "all" → everything connected;
+  // a project → only that project's channels.
+  const projectAccounts = (projectId) => {
+    if (projectId === 'all') return accounts;
+    return accounts.filter((a) => a.projectId === projectId);
   };
-  const visibleAccounts = groupAccounts(activeGroup);
+  const visibleAccounts = projectAccounts(activeProject);
 
-  // Switching tab filters the channels AND targets that group's channels, so the
-  // previews + publish follow the selected group.
-  const selectGroup = (groupId) => {
-    setActiveGroup(groupId);
-    setSelectedAccounts(groupAccounts(groupId).map((a) => a.id));
+  // Switching tab filters the channels AND targets that project's channels, so
+  // the previews and publish follow the selected project.
+  const selectProject = (projectId) => {
+    setActiveProject(projectId);
+    setSelectedAccounts(projectAccounts(projectId).map((a) => a.id));
   };
 
   const insertAtCaret = (text) => {
@@ -304,24 +306,25 @@ export default function ComposeModal({ open, onClose, accounts = [] }) {
         <div className="flex-1 grid lg:grid-cols-2 overflow-hidden">
           {/* LEFT: editor */}
           <div className="flex flex-col overflow-y-auto p-5 gap-4">
-            {/* Group tabs — fill the space above the channels. "All" is fixed;
-                each created group filters the channels to just its members. */}
+            {/* Project tabs — "All" is fixed; each project narrows the channels
+                (and therefore the previews and the publish) to that client. */}
             {accounts.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap border-b border-gray-100 pb-3">
-                <button onClick={() => selectGroup('all')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeGroup === 'all' ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-100'}`}>
+                <button onClick={() => selectProject('all')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeProject === 'all' ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-100'}`}>
                   All <span className="text-xs opacity-60">{accounts.length}</span>
                 </button>
-                {groups.map((g) => (
-                  <button key={g.id} onClick={() => selectGroup(g.id)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeGroup === g.id ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-100'}`}>
-                    {g.name} <span className="text-xs opacity-60">{groupAccounts(g.id).length}</span>
+                {projects.map((p) => (
+                  <button key={p.id} onClick={() => selectProject(p.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${activeProject === p.id ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-100'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color || '#5B53FF' }} />
+                    {p.name} <span className="text-xs opacity-60">{projectAccounts(p.id).length}</span>
                   </button>
                 ))}
-                <button onClick={() => { onClose(); navigate('/settings#groups'); }}
+                <button onClick={() => { onClose(); navigate('/accounts'); }}
                   className="px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-primary-600 hover:bg-gray-100"
-                  title="Manage channel groups in Settings">
-                  + Group
+                  title="Manage projects and channels">
+                  + Project
                 </button>
               </div>
             )}

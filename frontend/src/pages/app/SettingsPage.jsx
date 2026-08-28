@@ -549,71 +549,6 @@ function TagsPanel() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Features › Channel Groups                                           */
-/* ------------------------------------------------------------------ */
-
-function GroupsPanel() {
-  const [groups, setGroups] = useLocalState('orciid-groups', []);
-  const [accounts, setAccounts] = useState([]);
-  const [name, setName] = useState('');
-  const [picked, setPicked] = useState([]);
-  useEffect(() => { api.get('/social').then((r) => setAccounts(r.data)).catch(() => {}); }, []);
-
-  const toggle = (id) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
-  const add = (e) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setGroups([...groups, { id: `${Date.now()}`, name: name.trim(), channelIds: picked }]);
-    setName(''); setPicked([]);
-  };
-  const remove = (id) => setGroups(groups.filter((g) => g.id !== id));
-  const channelName = (id) => accounts.find((a) => a.id === id)?.name || 'channel';
-
-  return (
-    <div>
-      <PanelHeader title="Channel Groups" subtitle="Bundle channels so you can post to several at once" />
-      <form onSubmit={add} className="bg-gray-50 rounded-xl p-4 mb-6 max-w-xl">
-        <label className="label">Group name</label>
-        <input className="input bg-white mb-3" placeholder="e.g. All brand accounts" value={name} onChange={(e) => setName(e.target.value)} />
-        {accounts.length > 0 && (
-          <>
-            <label className="label">Channels in this group</label>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {accounts.map((a) => {
-                const meta = PLATFORM_META[a.platform] || {};
-                const on = picked.includes(a.id);
-                return (
-                  <button type="button" key={a.id} onClick={() => toggle(a.id)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm ${on ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 bg-white'}`}>
-                    {meta.logo && <img src={meta.logo} className="w-4 h-4 rounded" alt="" />}{a.name}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-        <button type="submit" className="btn-primary"><PlusIcon className="w-4 h-4 inline -mt-0.5 mr-1" />Create group</button>
-      </form>
-      {groups.length === 0 ? (
-        <p className="text-gray-400 text-sm">No groups yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {groups.map((g) => (
-            <div key={g.id} className="border border-gray-100 rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">{g.name}</p>
-                <p className="text-xs text-gray-500">{g.channelIds.length ? g.channelIds.map(channelName).join(', ') : 'No channels'}</p>
-              </div>
-              <button onClick={() => remove(g.id)} className="text-gray-300 hover:text-red-500 p-1"><TrashIcon className="w-4 h-4" /></button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* Features › Saved Replies                                            */
 /* ------------------------------------------------------------------ */
 
@@ -690,7 +625,6 @@ export default function SettingsPage() {
     ] },
     { group: 'Features', items: [
       { id: 'tags', label: 'Tags', icon: TagIcon },
-      { id: 'groups', label: 'Channel Groups', icon: FolderIcon },
       { id: 'replies', label: 'Saved Replies', icon: ChatBubbleLeftRightIcon },
     ] },
   ];
@@ -707,7 +641,6 @@ export default function SettingsPage() {
       case 'channels': return <ChannelsPanel />;
       case 'billing': return <BillingPanel />;
       case 'tags': return <TagsPanel />;
-      case 'groups': return <GroupsPanel />;
       case 'replies': return <RepliesPanel />;
       default: return <ProfilePanel />;
     }

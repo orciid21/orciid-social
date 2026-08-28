@@ -12,6 +12,7 @@ const SAFE_SOCIAL_ACCOUNT_SELECT = {
   username: true,
   avatar: true,
   isActive: true,
+  projectId: true,
 };
 
 // The user's primary workspace + their role in it. OWNER sorts first (MySQL

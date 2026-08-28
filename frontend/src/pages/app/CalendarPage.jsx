@@ -15,6 +15,13 @@ export default function CalendarPage() {
   const [posts, setPosts] = useState([]);
   const [selectedDay, setSelectedDay] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Same project scoping as the sidebar, Posts and the composer.
+  const [projects, setProjects] = useState([]);
+  const [project, setProject] = useState('ALL');
+
+  useEffect(() => {
+    api.get('/projects').then((r) => setProjects(r.data.projects || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchPosts();
@@ -39,7 +46,10 @@ export default function CalendarPage() {
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const startPadding = getDay(monthStart); // 0=Sun
 
-  const dayPosts = (date) => posts.filter((p) => p.scheduledAt && isSameDay(new Date(p.scheduledAt), date));
+  const inProject = (p) =>
+    project === 'ALL' || p.accounts?.some((pa) => pa.socialAccount?.projectId === project);
+  const dayPosts = (date) =>
+    posts.filter((p) => p.scheduledAt && isSameDay(new Date(p.scheduledAt), date) && inProject(p));
   const selectedPosts = selectedDay ? dayPosts(selectedDay) : [];
 
   return (
@@ -51,6 +61,27 @@ export default function CalendarPage() {
           Schedule Post
         </Link>
       </div>
+
+      {projects.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {[{ id: 'ALL', name: 'All projects' }, ...projects].map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setProject(p.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+                project === p.id
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {p.id !== 'ALL' && (
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color || '#5B53FF' }} />
+              )}
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Calendar */}

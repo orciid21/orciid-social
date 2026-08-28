@@ -50,6 +50,41 @@ const requireSubscription = (plans = []) => {
   };
 };
 
+// Gate for the two actions that cost us money to run: connecting a channel and
+// creating a post. Signing up and looking around stays free; doing the work
+// needs a paid plan.
+//
+// Deliberately stricter than requireSubscription above, which also lets
+// TRIALING through: a trial is a look, not a licence. ADMINs are exempt so the
+// team can always operate the product they're selling.
+const PAID_STATUSES = ['ACTIVE'];
+
+const requirePaid = (req, res, next) => {
+  if (req.user?.role === 'ADMIN') return next();
+
+  const sub = req.user?.subscription;
+  const status = sub?.status;
+
+  if (PAID_STATUSES.includes(status)) return next();
+
+  const reason =
+    status === 'PAST_DUE'
+      ? 'Your last payment did not go through. Update your payment method to continue.'
+      : status === 'CANCELED'
+        ? 'Your subscription was cancelled. Choose a plan to continue.'
+        : 'Choose a plan to connect channels and publish posts.';
+
+  return res.status(402).json({
+    error: reason,
+    code: 'PAYMENT_REQUIRED',
+    status: status || 'NONE',
+  });
+};
+
+// Same rule, for flows that resolve the user themselves (OAuth callbacks) rather
+// than going through the authenticate middleware.
+const isPaidUser = (user) => user?.role === 'ADMIN' || PAID_STATUSES.includes(user?.subscription?.status);
+
 const requireAdmin = (req, res, next) => {
   if (req.user?.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -57,4 +92,4 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, requireSubscription, requireAdmin };
+module.exports = { authenticate, requireSubscription, requirePaid, isPaidUser, requireAdmin };

@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { PLATFORM_LOGOS } from '../../utils/platforms';
+import ChannelAvatar from '../../components/ChannelAvatar';
 
 const mockChartData = [
   { day: 'Mon', likes: 120, reach: 450 },
@@ -44,18 +45,22 @@ export default function DashboardPage() {
   // One row per project, so the dashboard answers "how is each client doing?"
   const [projectRows, setProjectRows] = useState([]);
   const [unassignedChannels, setUnassignedChannels] = useState(0);
+  // What worked, what's gone quiet, what's waiting on a decision.
+  const [insights, setInsights] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, postsRes, scheduledRes, projectsRes] = await Promise.all([
+        const [statsRes, postsRes, scheduledRes, projectsRes, insightsRes] = await Promise.all([
           api.get('/analytics/overview').catch(() => ({ data: null })),
           api.get('/posts?limit=5').catch(() => ({ data: {} })),
           api.get('/posts?status=SCHEDULED&limit=3').catch(() => ({ data: {} })),
           api.get('/projects/summary').catch(() => ({ data: {} })),
+          api.get('/analytics/insights').catch(() => ({ data: null })),
         ]);
         setProjectRows(projectsRes.data?.projects || []);
         setUnassignedChannels(projectsRes.data?.unassignedChannels || 0);
+        setInsights(insightsRes.data || null);
         setStats(statsRes.data || { totalPosts: 0, scheduledPosts: 0, publishedPosts: 0, accountsCount: 0 });
         setRecentPosts(postsRes.data?.posts || []);
         setScheduledPosts(scheduledRes.data?.posts || []);
@@ -170,6 +175,125 @@ export default function DashboardPage() {
                 )}
               </Link>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Needs your attention: what worked, what's gone quiet, what's waiting */}
+      {insights && (
+        <div className="grid lg:grid-cols-3 gap-5">
+          {/* Best post of the week */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex w-8 h-8 rounded-lg bg-iris-light/15 text-iris-dark items-center justify-center">
+                <ArrowTrendingUpIcon className="w-4 h-4" />
+              </span>
+              <h2 className="font-semibold text-gray-900 text-sm">Best post this week</h2>
+            </div>
+
+            {!insights.topPost ? (
+              <p className="text-sm text-gray-400 py-4">
+                No engagement recorded in the last {insights.windowDays} days yet.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-700 line-clamp-3">{insights.topPost.post.content}</p>
+                <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                  <span>{insights.topPost.likes?.toLocaleString()} likes</span>
+                  <span>{insights.topPost.comments?.toLocaleString()} comments</span>
+                  <span>{insights.topPost.shares?.toLocaleString()} shares</span>
+                </div>
+                <div className="flex -space-x-1.5 mt-3">
+                  {insights.topPost.post.channels?.slice(0, 3).map((ch) => (
+                    <ChannelAvatar key={ch.id} account={ch} size="w-6 h-6" badge="w-3 h-3" rounded="rounded-md" />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Channels that have gone quiet */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex w-8 h-8 rounded-lg bg-coral-light/20 text-coral-dark items-center justify-center">
+                <ClockIcon className="w-4 h-4" />
+              </span>
+              <h2 className="font-semibold text-gray-900 text-sm">
+                Needs attention
+                {insights.quietChannelCount > 0 && (
+                  <span className="ml-1.5 text-xs font-normal text-gray-400">
+                    {insights.quietChannelCount}
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            {insights.quietChannels?.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4">Every channel has posted recently.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {insights.quietChannels.map((ch) => (
+                  <Link
+                    key={ch.id}
+                    to={`/channel/${ch.id}`}
+                    className="flex items-center gap-2.5 hover:bg-gray-50 -mx-2 px-2 py-1 rounded-lg"
+                  >
+                    <ChannelAvatar account={ch} size="w-7 h-7" badge="w-3 h-3" rounded="rounded-md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-gray-900 truncate">{ch.name}</p>
+                      <p className="text-[11px] text-gray-400">
+                        {ch.lastPostedAt
+                          ? `Last post ${new Date(ch.lastPostedAt).toLocaleDateString()}`
+                          : 'Never posted'}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Waiting on approval */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex w-8 h-8 rounded-lg bg-primary-50 text-primary-600 items-center justify-center">
+                <CheckBadgeIcon className="w-4 h-4" />
+              </span>
+              <h2 className="font-semibold text-gray-900 text-sm">
+                Waiting for approval
+                {insights.pendingApproval?.count > 0 && (
+                  <span className="ml-1.5 text-xs font-normal text-gray-400">
+                    {insights.pendingApproval.count}
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            {!insights.pendingApproval?.count ? (
+              <p className="text-sm text-gray-400 py-4">Nothing waiting on you.</p>
+            ) : (
+              <div className="space-y-3">
+                {insights.pendingApproval.posts.map((post) => (
+                  <div key={post.id}>
+                    <p className="text-xs text-gray-700 line-clamp-2">{post.content}</p>
+                    <div className="flex -space-x-1.5 mt-1.5">
+                      {post.accounts?.slice(0, 3).map((pa) => (
+                        <ChannelAvatar
+                          key={pa.id}
+                          account={pa.socialAccount}
+                          size="w-5 h-5"
+                          badge="w-2.5 h-2.5"
+                          rounded="rounded"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <Link to="/posts" className="inline-block text-xs font-medium text-primary-600 pt-1">
+                  Review all →
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

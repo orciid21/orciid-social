@@ -252,6 +252,23 @@ const verifyDatabaseInBackground = async () => {
 // freshly-spawned engine before it could answer — so a boot panic never cleared
 // and the site stayed 500. Starting it post-boot keeps a single recoverer during
 // the fragile boot window, then guards the runtime.
+// Collect engagement for recently published posts. Every 6 hours is enough to
+// draw a daily curve without adding meaningful load to a shared host, and the
+// first run is delayed so it never competes with boot.
+const startEngagementCollection = () => {
+  const analyticsService = require('./services/analytics.service');
+  const run = async () => {
+    try {
+      const result = await analyticsService.collectEngagement({ days: 30, limit: 60 });
+      write(`Engagement collected: ${result.stored} stored, ${result.skipped} skipped of ${result.checked}`);
+    } catch (err) {
+      write('Engagement collection failed: ' + String(err.message || err).slice(0, 140));
+    }
+  };
+  setTimeout(run, 60000);
+  setInterval(run, 6 * 60 * 60 * 1000);
+};
+
 const startDbMonitor = () => {
   setInterval(async () => {
     try {
@@ -277,6 +294,7 @@ verifyDatabaseInBackground()
   .then(ensureColumns)
   .then(ensurePlatformEnum)
   .then(fixupFacebookAvatars)
+  .then(() => startEngagementCollection())
   .then(startDbMonitor);
 
 process.on('SIGTERM', () => {

@@ -11,15 +11,6 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { PLATFORM_LOGOS } from '../../utils/platforms';
 import ChannelAvatar from '../../components/ChannelAvatar';
 
-const mockChartData = [
-  { day: 'Mon', likes: 120, reach: 450 },
-  { day: 'Tue', likes: 180, reach: 620 },
-  { day: 'Wed', likes: 150, reach: 530 },
-  { day: 'Thu', likes: 240, reach: 780 },
-  { day: 'Fri', likes: 200, reach: 710 },
-  { day: 'Sat', likes: 310, reach: 920 },
-  { day: 'Sun', likes: 280, reach: 860 },
-];
 
 const PLATFORM_COLORS = {
   FACEBOOK: 'bg-blue-500',
@@ -47,20 +38,26 @@ export default function DashboardPage() {
   const [unassignedChannels, setUnassignedChannels] = useState(0);
   // What worked, what's gone quiet, what's waiting on a decision.
   const [insights, setInsights] = useState(null);
+  // Real engagement, from the dated snapshots the collector stores.
+  const [series, setSeries] = useState([]);
+  const [seriesHasData, setSeriesHasData] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, postsRes, scheduledRes, projectsRes, insightsRes] = await Promise.all([
+        const [statsRes, postsRes, scheduledRes, projectsRes, insightsRes, seriesRes] = await Promise.all([
           api.get('/analytics/overview').catch(() => ({ data: null })),
           api.get('/posts?limit=5').catch(() => ({ data: {} })),
           api.get('/posts?status=SCHEDULED&limit=3').catch(() => ({ data: {} })),
           api.get('/projects/summary').catch(() => ({ data: {} })),
           api.get('/analytics/insights').catch(() => ({ data: null })),
+          api.get('/analytics/series?days=7').catch(() => ({ data: null })),
         ]);
         setProjectRows(projectsRes.data?.projects || []);
         setUnassignedChannels(projectsRes.data?.unassignedChannels || 0);
         setInsights(insightsRes.data || null);
+        setSeries(seriesRes.data?.series || []);
+        setSeriesHasData(Boolean(seriesRes.data?.hasData));
         setStats(statsRes.data || { totalPosts: 0, scheduledPosts: 0, publishedPosts: 0, accountsCount: 0 });
         setRecentPosts(postsRes.data?.posts || []);
         setScheduledPosts(scheduledRes.data?.posts || []);
@@ -385,8 +382,16 @@ export default function DashboardPage() {
               </span>
             </div>
           </div>
+          {!seriesHasData ? (
+            <div className="h-[180px] flex flex-col items-center justify-center text-center">
+              <p className="text-sm text-gray-500">No engagement recorded yet</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Numbers appear here within a few hours of your first post going live.
+              </p>
+            </div>
+          ) : (
           <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={mockChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+            <AreaChart data={series} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gLikes" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
@@ -406,6 +411,7 @@ export default function DashboardPage() {
               <Area type="monotone" dataKey="reach" stroke="#a78bfa" strokeWidth={2.5} fill="url(#gReach)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
+          )}
         </div>
 
         {/* Upcoming scheduled posts */}

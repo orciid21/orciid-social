@@ -140,6 +140,62 @@ const getInsights = async (req, res, next) => {
   }
 };
 
+
+// GET /analytics/series — a real engagement curve, built from the dated
+// snapshots the collector stores. For each day we take the LATEST snapshot per
+// post and sum those, so a post counted once per day regardless of how many
+// times it was polled, and the line reflects the total engagement standing on
+// that day rather than the number of times we asked.
+const getSeries = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const days = Math.min(Number(req.query.days) || 7, 90);
+    const since = new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000);
+    since.setHours(0, 0, 0, 0);
+
+    const rows = await prisma.postAnalytics.findMany({
+      where: { post: { userId }, fetchedAt: { gte: since } },
+      select: { postId: true, likes: true, comments: true, shares: true, reach: true, impressions: true, fetchedAt: true },
+      orderBy: { fetchedAt: 'asc' },
+    });
+
+    // day -> postId -> latest snapshot
+    const byDay = new Map();
+    for (const r of rows) {
+      const day = r.fetchedAt.toISOString().slice(0, 10);
+      if (!byDay.has(day)) byDay.set(day, new Map());
+      byDay.get(day).set(r.postId, r); // ordered ascending, so the last write wins
+    }
+
+    const series = [];
+    for (let i = 0; i < days; i += 1) {
+      const d = new Date(since);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const snapshots = byDay.get(key);
+      let likes = 0; let reach = 0; let engagement = 0;
+      if (snapshots) {
+        for (const s of snapshots.values()) {
+          likes += s.likes || 0;
+          reach += s.reach || 0;
+          engagement += (s.likes || 0) + (s.comments || 0) + (s.shares || 0);
+        }
+      }
+      series.push({
+        date: key,
+        day: d.toLocaleDateString(undefined, { weekday: 'short' }),
+        likes,
+        reach,
+        engagement,
+      });
+    }
+
+    res.json({ series, hasData: rows.length > 0 });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getPostAnalytics = async (req, res, next) => {
   try {
     const analytics = await prisma.postAnalytics.findMany({
@@ -168,4 +224,4 @@ const getAccountAnalytics = async (req, res, next) => {
   }
 };
 
-module.exports = { getOverview, getPostAnalytics, getAccountAnalytics, getInsights };
+module.exports = { getOverview, getPostAnalytics, getAccountAnalytics, getInsights, getSeries };

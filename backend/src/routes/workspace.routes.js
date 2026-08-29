@@ -114,14 +114,32 @@ router.post('/team/invite', async (req, res, next) => {
       });
     }
 
-    // Notify the invitee by email (non-fatal — needs SMTP_* env configured).
-    try {
-      await emailService.sendInvitationEmail(email, req.user.name, workspace.name, inviteRole);
-    } catch (mailErr) {
-      console.warn('Invitation email failed (SMTP not configured?):', mailErr.message);
+    // Notify the invitee. Sending must not fail the invite — the membership is
+    // already recorded — but the result is reported back, because an invite the
+    // person never receives looks identical to one that worked, which is how a
+    // whole team can silently never arrive.
+    let emailSent = false;
+    let emailError = null;
+    if (!emailService.isConfigured) {
+      emailError = 'Email is not set up on the server, so no invitation was sent.';
+    } else {
+      try {
+        await emailService.sendInvitationEmail(email, req.user.name, workspace.name, inviteRole);
+        emailSent = true;
+      } catch (mailErr) {
+        console.warn('Invitation email failed:', mailErr.message);
+        emailError = 'The invitation was saved, but the email could not be sent.';
+      }
     }
 
-    res.status(201).json(await teamPayload(workspace.id, role, req.user.id));
+    const payload = await teamPayload(workspace.id, role, req.user.id);
+    res.status(201).json({
+      ...payload,
+      emailSent,
+      emailError,
+      // So the inviter can pass the link on by hand when email is unavailable.
+      inviteLink: `${process.env.FRONTEND_URL || 'https://orciid.online'}/register?email=${encodeURIComponent(email)}`,
+    });
   } catch (err) { next(err); }
 });
 

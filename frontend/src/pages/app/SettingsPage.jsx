@@ -298,17 +298,46 @@ function TeamPanel({ team, reload, loading }) {
 
   const canManage = team.currentRole === 'OWNER' || team.currentRole === 'ADMIN';
 
+  // Kept when an invite is saved but the email didn't go out, so the link
+
+  // can still be handed over.
+
+  const [lastInvite, setLastInvite] = useState(null);
+
+
   const invite = async (e) => {
     e.preventDefault();
     if (!email.trim()) return;
     setBusy(true);
     try {
-      await api.post('/workspaces/team/invite', { email: email.trim(), role });
+      const res = await api.post('/workspaces/team/invite', { email: email.trim(), role });
+      const invited = email.trim();
       setEmail('');
-      toast.success('Invitation sent');
+      // Say what actually happened. "Invitation sent" when no email left the
+      // server is how an invite quietly goes nowhere.
+      if (res.data?.emailSent) {
+        toast.success(`Invitation emailed to ${invited}`);
+        setLastInvite(null);
+      } else {
+        toast(res.data?.emailError || 'Invitation saved, but no email was sent.', {
+          icon: '⚠️',
+          duration: 7000,
+        });
+        setLastInvite({ email: invited, link: res.data?.inviteLink });
+      }
       reload();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to invite'); }
     finally { setBusy(false); }
+  };
+
+  const copyInviteLink = async () => {
+    if (!lastInvite?.link) return;
+    try {
+      await navigator.clipboard.writeText(lastInvite.link);
+      toast.success('Invite link copied');
+    } catch {
+      toast.error('Could not copy — select the link and copy it manually');
+    }
   };
 
   const changeRole = async (userId, newRole) => {
@@ -381,6 +410,22 @@ function TeamPanel({ team, reload, loading }) {
           );
         })}
       </div>
+
+      {lastInvite && (
+        <div className="mb-6 -mt-2 flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">
+              No email reached {lastInvite.email}
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5 break-all">
+              Send them this link instead: {lastInvite.link}
+            </p>
+          </div>
+          <button onClick={copyInviteLink} className="btn-secondary text-xs flex-shrink-0">
+            Copy link
+          </button>
+        </div>
+      )}
 
       {/* Pending invites */}
       {team.invitations.length > 0 && (

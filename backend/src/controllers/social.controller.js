@@ -3,10 +3,24 @@ const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
 const { FB_GRAPH, fbPagePicture, fetchManageablePages } = require('../services/facebook.service');
 
+// Channels are visible to the whole workspace, not just whoever connected them.
+// Scoping them to their owner is what left an invited teammate staring at an
+// empty dashboard: they were a member of the workspace, but every channel
+// belonged to someone else.
+const channelScope = async (userId) => {
+  const m = await prisma.workspaceMember.findFirst({
+    where: { userId },
+    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+  });
+  return m?.workspaceId
+    ? { isActive: true, OR: [{ userId }, { workspaceId: m.workspaceId }] }
+    : { isActive: true, userId };
+};
+
 const getAccounts = async (req, res, next) => {
   try {
     const accounts = await prisma.socialAccount.findMany({
-      where: { userId: req.user.id, isActive: true },
+      where: await channelScope(req.user.id),
       orderBy: { createdAt: 'desc' },
       // Never send accessToken/refreshToken to the browser — Page tokens are
       // server-side secrets.
@@ -243,6 +257,7 @@ const debugFacebook = async (req, res) => {
 };
 
 module.exports = {
+  channelScope,
   getAccounts,
   disconnectAccount,
   getConnectUrl,

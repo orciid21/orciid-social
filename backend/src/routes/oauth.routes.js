@@ -16,7 +16,19 @@ const getUserFromToken = async (token) => {
 };
 
 // Upsert social account
+// A channel belongs to the workspace, not just the person who connected it —
+// otherwise a teammate invited to help would sign in to an empty dashboard,
+// because every channel query is scoped to its owner.
+const workspaceIdFor = async (userId) => {
+  const m = await prisma.workspaceMember.findFirst({
+    where: { userId },
+    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+  });
+  return m?.workspaceId || null;
+};
+
 const saveSocialAccount = async (userId, platform, profileData) => {
+  const workspaceId = await workspaceIdFor(userId);
   return prisma.socialAccount.upsert({
     where: { userId_platform_platformId: { userId, platform, platformId: profileData.platformId } },
     update: {
@@ -27,9 +39,11 @@ const saveSocialAccount = async (userId, platform, profileData) => {
       refreshToken: profileData.refreshToken,
       tokenExpiry: profileData.tokenExpiry,
       isActive: true,
+      ...(workspaceId ? { workspaceId } : {}),
     },
     create: {
       userId,
+      workspaceId,
       platform,
       platformId: profileData.platformId,
       name: profileData.name,

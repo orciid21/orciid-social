@@ -255,6 +255,35 @@ const verifyDatabaseInBackground = async () => {
 // Collect engagement for recently published posts. Every 6 hours is enough to
 // draw a daily curve without adding meaningful load to a shared host, and the
 // first run is delayed so it never competes with boot.
+// Channels connected before they were workspace-aware carry no workspaceId, so
+// a teammate still wouldn't see them. Attach each to its owner's workspace once;
+// the query only touches rows that are still null, so it is cheap on every boot.
+const backfillChannelWorkspaces = async () => {
+  try {
+    const orphans = await prismaClient.socialAccount.findMany({
+      where: { workspaceId: null },
+      select: { id: true, userId: true },
+    });
+    if (orphans.length === 0) return;
+    const owners = [...new Set(orphans.map((o) => o.userId))];
+    const memberships = await prismaClient.workspaceMember.findMany({
+      where: { userId: { in: owners } },
+      select: { userId: true, workspaceId: true },
+    });
+    const wsByUser = Object.fromEntries(memberships.map((m) => [m.userId, m.workspaceId]));
+    let fixed = 0;
+    for (const o of orphans) {
+      const workspaceId = wsByUser[o.userId];
+      if (!workspaceId) continue;
+      await prismaClient.socialAccount.update({ where: { id: o.id }, data: { workspaceId } });
+      fixed += 1;
+    }
+    write(`Channel workspace backfill: ${fixed} of ${orphans.length} attached`);
+  } catch (err) {
+    write('backfillChannelWorkspaces error: ' + (err.message || err));
+  }
+};
+
 const startEngagementCollection = () => {
   const analyticsService = require('./services/analytics.service');
   const run = async () => {
@@ -294,6 +323,7 @@ verifyDatabaseInBackground()
   .then(ensureColumns)
   .then(ensurePlatformEnum)
   .then(fixupFacebookAvatars)
+  .then(backfillChannelWorkspaces)
   .then(() => startEngagementCollection())
   .then(startDbMonitor);
 

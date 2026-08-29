@@ -56,9 +56,24 @@ const register = async (req, res, next) => {
     // Convert any pending team invitations for this email into memberships, so
     // an invited person automatically joins the inviter's workspace on sign-up.
     try {
-      const invites = await prisma.invitation.findMany({
-        where: { email: email.toLowerCase(), status: 'PENDING' },
+      // Gmail ignores dots, so an invite to omar.awdia@gmail.com and a sign-up as
+      // omarawdia@gmail.com are the same person. Compare a normalised form on
+      // BOTH sides — stripping dots from only one still misses the pairing.
+      const normalise = (addr) => {
+        const [local, domain] = String(addr).toLowerCase().split('@');
+        if (!domain) return String(addr).toLowerCase();
+        const bare = ['gmail.com', 'googlemail.com'].includes(domain)
+          ? local.replace(/\./g, '')
+          : local;
+        return `${bare}@${domain}`;
+      };
+      const target = normalise(email);
+      const domain = String(email).toLowerCase().split('@')[1] || '';
+      const candidates = await prisma.invitation.findMany({
+        where: { status: 'PENDING', email: { endsWith: `@${domain}` } },
+        take: 200,
       });
+      const invites = candidates.filter((inv) => normalise(inv.email) === target);
       for (const inv of invites) {
         await prisma.workspaceMember.upsert({
           where: { userId_workspaceId: { userId: user.id, workspaceId: inv.workspaceId } },

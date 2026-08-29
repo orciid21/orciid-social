@@ -45,8 +45,9 @@ router.get('/', async (req, res, next) => {
         })
       : [];
 
+    const { channelScope } = require('../controllers/social.controller');
     const unassigned = await prisma.socialAccount.findMany({
-      where: { userId, isActive: true, projectId: null },
+      where: { ...(await channelScope(userId)), projectId: null },
       select: CHANNEL_FIELDS,
       orderBy: { createdAt: 'asc' },
     });

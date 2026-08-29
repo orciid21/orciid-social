@@ -1,11 +1,16 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 import toast from 'react-hot-toast';
 import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  // An invite link carries the address the invitation was issued to. Prefill and
+  // lock it: the invitation is matched by email, so letting it be retyped is how
+  // a single missing character leaves the person outside the team they joined.
+  const [searchParams] = useSearchParams();
+  const invitedEmail = (searchParams.get('email') || '').trim();
+  const [form, setForm] = useState({ name: '', email: invitedEmail, password: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuthStore();
@@ -70,6 +75,7 @@ export default function RegisterPage() {
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                readOnly={Boolean(invitedEmail)}
                 required
               />
             </div>

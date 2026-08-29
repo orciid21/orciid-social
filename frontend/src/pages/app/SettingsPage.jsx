@@ -291,19 +291,17 @@ function TeamPanel({ team, reload, loading }) {
   const [role, setRole] = useState('MEMBER');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(null);
+  // Kept when an invite is saved but its email didn't go out, so the link can
+  // still be handed over. Must sit with the other hooks: this component returns
+  // early while the team loads, and a hook after that point runs conditionally,
+  // which React rejects — it blanked the whole settings page.
+  const [lastInvite, setLastInvite] = useState(null);
 
   if (loading || !team) {
     return <div className="text-gray-400 text-sm">Loading team…</div>;
   }
 
   const canManage = team.currentRole === 'OWNER' || team.currentRole === 'ADMIN';
-
-  // Kept when an invite is saved but the email didn't go out, so the link
-
-  // can still be handed over.
-
-  const [lastInvite, setLastInvite] = useState(null);
-
 
   const invite = async (e) => {
     e.preventDefault();

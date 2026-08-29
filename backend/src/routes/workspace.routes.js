@@ -128,7 +128,11 @@ router.post('/team/invite', async (req, res, next) => {
         emailSent = true;
       } catch (mailErr) {
         console.warn('Invitation email failed:', mailErr.message);
-        emailError = 'The invitation was saved, but the email could not be sent.';
+        // Include the server's own reason. Without it "could not be sent" gives
+        // no way to tell a wrong password from a blocked port. SMTP errors
+        // describe the connection, never the credentials themselves.
+        const detail = String(mailErr.message || '').slice(0, 160);
+        emailError = `The invitation was saved, but the email could not be sent — ${detail}`;
       }
     }
 

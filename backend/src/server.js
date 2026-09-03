@@ -306,11 +306,15 @@ const startDbMonitor = () => {
       write('DB monitor: probe failed, recycling engine — ' + String(err.message || err).slice(0, 120));
       try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
     }
-    // Every 5 minutes, not every 20 seconds. The old interval fired ~4,300
-    // queries a day purely to watch the connection, which is a meaningful
-    // constant load on a shared host — and it never actually prevented the
-    // panics it was watching for.
-  }, 300000);
+    // Every 30 minutes. The SELECT 1 itself is cheap — the cost this interval
+    // really governs is the FAILURE path: each failed probe tears the query
+    // engine down, and the next query pays a full engine spawn + MySQL
+    // handshake, which is orders of magnitude dearer than the probe. A short
+    // interval therefore does its most expensive work exactly when the host is
+    // already struggling. Thirty minutes costs nothing to be late: a panicked
+    // engine is recovered per-request by the retry wrapper in config/prisma.js,
+    // so no user ever waits on this monitor to notice.
+  }, 1800000);
 };
 
 // LISTEN FIRST — the platform proxy 503s the whole site if the port doesn't

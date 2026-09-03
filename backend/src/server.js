@@ -171,6 +171,68 @@ const ensurePlatformEnum = async () => {
   }
 };
 
+// --- Idempotent index creation -------------------------------------------
+// Indexes reach production the same way columns do, and for the same reason: the
+// `prisma` CLI cannot be relied on here, so an @@index added to schema.prisma may
+// never actually exist on the live database.
+//
+// Matching on index NAME would not be safe. InnoDB silently creates its own index
+// for every foreign key, under its own name, so a name check would happily add a
+// second, byte-identical index — a permanent write-cost tax that nothing ever
+// removes. Instead each entry is compared against the table's REAL index layout:
+// if any existing index already begins with the same columns in the same order,
+// ours is redundant under MySQL's leftmost-prefix rule and is skipped. That also
+// settles the one genuinely ambiguous case (SocialAccount.projectId, which has an
+// index only if `prisma db push` ever ran) by looking instead of assuming.
+//
+// Table, index and column names are hardcoded constants, never user input, so
+// inlining them into the DDL is safe.
+const PENDING_INDEXES = [
+  { table: 'PostAnalytics', name: 'PostAnalytics_postId_fetchedAt_idx', columns: ['postId', 'fetchedAt'] },
+  { table: 'Post', name: 'Post_userId_status_publishedAt_idx', columns: ['userId', 'status', 'publishedAt'] },
+  { table: 'Post', name: 'Post_status_createdAt_idx', columns: ['status', 'createdAt'] },
+  { table: 'Post', name: 'Post_userId_scheduledAt_idx', columns: ['userId', 'scheduledAt'] },
+  { table: 'PostAccount', name: 'PostAccount_status_publishedAt_idx', columns: ['status', 'publishedAt'] },
+  { table: 'SocialAccount', name: 'SocialAccount_projectId_idx', columns: ['projectId'] },
+];
+
+// Every index on a table, as an ordered column list per index name.
+const readIndexLayout = async (table) => {
+  const rows = await prismaClient.$queryRawUnsafe(
+    'SELECT INDEX_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS ' +
+      'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX',
+    table
+  );
+  const byName = new Map();
+  for (const r of rows || []) {
+    if (!byName.has(r.INDEX_NAME)) byName.set(r.INDEX_NAME, []);
+    byName.get(r.INDEX_NAME).push(r.COLUMN_NAME);
+  }
+  return Array.from(byName.values());
+};
+
+const ensureIndexes = async () => {
+  for (const { table, name, columns } of PENDING_INDEXES) {
+    try {
+      const layout = await readIndexLayout(table);
+      // Redundant if some existing index already leads with exactly our columns.
+      const covered = layout.some((cols) => columns.every((c, i) => cols[i] === c));
+      if (covered) {
+        write(`Index ${table}(${columns.join(',')}) already covered — skipping`);
+        continue;
+      }
+      const ddl =
+        'CREATE INDEX `' + name + '` ON `' + table + '` (' +
+        columns.map((c) => '`' + c + '`').join(', ') + ')';
+      await prismaClient.$executeRawUnsafe(ddl);
+      write(`Index ${name} created on ${table}`);
+    } catch (err) {
+      // Never let a migration hiccup stop the server from booting.
+      write(`ensureIndexes error for ${table}.${name}: ` + (err.message || err));
+    }
+  }
+};
+
 const startServer = () => {
   write('Starting server on port: ' + PORT);
   server = app.listen(PORT, () => {
@@ -326,6 +388,7 @@ verifyDatabaseInBackground()
   .then(ensureTables)
   .then(ensureColumns)
   .then(ensurePlatformEnum)
+  .then(ensureIndexes)
   .then(fixupFacebookAvatars)
   .then(backfillChannelWorkspaces)
   .then(() => startEngagementCollection())

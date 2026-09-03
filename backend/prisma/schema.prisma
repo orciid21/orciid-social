@@ -137,6 +137,13 @@ model SocialAccount {
   posts     PostAccount[]
 
   @@unique([userId, platform, platformId])
+
+  // projectId is declared as a relation here, but in production the column was
+  // added by raw ALTER TABLE (see PENDING_COLUMNS) with no FOREIGN KEY, so InnoDB
+  // never created the index a relation would normally bring. That left the
+  // projects sidebar — which loads on every page — scanning the whole table.
+  // ensureIndexes() checks the live schema and skips this if an index does exist.
+  @@index([projectId])
 }
 
 model Post {
@@ -156,6 +163,19 @@ model Post {
   workspace Workspace? @relation(fields: [workspaceId], references: [id])
   accounts  PostAccount[]
   analytics PostAnalytics[]
+
+  // Post carries no unique constraint, so before these every dashboard count ran
+  // off the bare userId foreign-key index and then filtered status row by row —
+  // i.e. it touched every post the user had ever written.
+  @@index([userId, status, publishedAt])
+  // status leads for two different readers: the approval queue (a count + an
+  // ORDER BY createdAt take:3, both on every dashboard mount) and the boot-time
+  // scheduler reload, which selects every SCHEDULED post with no limit.
+  @@index([status, createdAt])
+  // The calendar is the best-shaped query in the app: equality on userId, range
+  // on scheduledAt, and a sort on that same column — one index scan serves all
+  // three. It has no take, so a busy month is hundreds of rows filesorted today.
+  @@index([userId, scheduledAt])
 }
 
 model PostAccount {
@@ -171,6 +191,12 @@ model PostAccount {
   socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
 
   @@unique([postId, socialAccountId])
+
+  // The 6-hourly engagement collector is the only query in the codebase with no
+  // tenant scoping — it sweeps this table across every customer. The unique above
+  // cannot help it (neither column is filtered), so it is a full scan plus a
+  // filesort today, and take:60 bounds the rows RETURNED, not the rows examined.
+  @@index([status, publishedAt])
 }
 
 model PostAnalytics {
@@ -186,6 +212,12 @@ model PostAnalytics {
   fetchedAt DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // The highest-value index here. This table is append-only and never pruned, and
+  // five per-request dashboard queries share one shape: postId (through a
+  // post.userId subquery) plus a fetchedAt range. postId is the equality column,
+  // fetchedAt the range — and the prefix still serves the postId-only loads.
+  @@index([postId, fetchedAt])
 }
 
 enum Role {

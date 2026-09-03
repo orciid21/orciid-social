@@ -1,5 +1,25 @@
 const { PrismaClient } = require('@prisma/client');
 
+// Cap the query engine's thread count BEFORE the engine ever starts.
+//
+// The engine is Rust on a tokio runtime, and tokio's documented default is "the
+// number of cores available to the system". On shared hosting that is the whole
+// physical machine's core count, not our slice of it — the same trap as the
+// connection pool below, which also sized itself off cores it does not have.
+//
+// That matters here because Hostinger caps this account at 120 processes and
+// CloudLinux counts THREADS against that cap, not just processes. "PANIC: timer
+// has gone away" is this engine failing to spawn a thread once the cap is hit, so
+// an engine that opens one worker per host core is spending the exact budget whose
+// exhaustion kills it. Two workers is plenty for this workload and leaves the
+// budget for the app itself.
+//
+// Set here rather than in the host's env panel so it cannot be lost by an env
+// edit, and so it is read from the same file that documents why it exists.
+if (!process.env.TOKIO_WORKER_THREADS) {
+  process.env.TOKIO_WORKER_THREADS = '2';
+}
+
 // Cap the connection pool. Prisma's default is (CPU cores x 2) + 1, and on a
 // shared host it sees the WHOLE machine's cores — so it opens dozens of
 // connections for an app that needs a handful. That is a large, permanent draw

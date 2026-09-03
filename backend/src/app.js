@@ -73,7 +73,18 @@ app.use(express.static(path.join(__dirname, '../public')));
 // without exposing any schema detail, and without needing shell or file-manager
 // access to the host.
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), boot: bootStatus });
+  // cores is here to test one specific theory: the Prisma query engine's tokio
+  // runtime defaults to one worker thread PER CORE, and on shared hosting it sees
+  // the whole physical machine. With a 120-process account cap that counts threads,
+  // a host reporting 32+ cores means a single engine was spending a quarter of the
+  // budget on idle workers. tokioWorkers shows what we capped it to.
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    boot: bootStatus,
+    cores: require('os').cpus().length,
+    tokioWorkers: process.env.TOKIO_WORKER_THREADS || 'default (= cores)',
+  });
 });
 
 // Database reachability probe.

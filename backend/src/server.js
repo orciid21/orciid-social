@@ -298,6 +298,22 @@ const withTimeout = (promise, ms, label) =>
 // engine with $disconnect (the next query spawns a new engine) and retry
 // forever. Static pages + non-DB routes keep serving, and DB calls recover
 // in-place the moment MySQL is reachable again — no downtime, no crash loop.
+// Retry forever, but SLOWLY, and without rebuilding the engine every time.
+//
+// This loop used to probe every ~23s and call $disconnect() on each failure. That
+// is actively harmful given what the panic actually is: Hostinger caps the account
+// at 120 processes (NPROC), and "timer has gone away" is the Rust engine failing to
+// SPAWN a thread once that cap is hit — not CPU starvation. Recycling the engine
+// spawns threads. So while the database was unreachable, this loop was trying to
+// create new threads every 23 seconds inside the very limit it had already
+// exhausted, holding the account pinned at its ceiling and preventing the recovery
+// it was written to perform. Support confirmed NPROC "repeatedly reached 120".
+//
+// So: back off to a 5-minute ceiling, and recycle the engine only every 5th
+// attempt. Probes drop from ~156/hour to ~12/hour and engine respawns — the part
+// that actually needs threads — from ~156/hour to ~2. That lets the process count
+// fall back below the limit while we wait, instead of pinning it there.
+const DB_PROBE_MAX_DELAY = 300000;
 const verifyDatabaseInBackground = async () => {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -308,9 +324,12 @@ const verifyDatabaseInBackground = async () => {
     } catch (err) {
       const msg = String(err.message || err);
       write('Database check failed (attempt ' + attempt + '): ' + msg.slice(0, 160));
-      // Recycle the engine: $disconnect discards it, the next query spawns a new one.
-      try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
-      await new Promise((r) => setTimeout(r, attempt >= 5 ? 15000 : 2000));
+      // Only recycle occasionally — each recycle costs threads we may not have.
+      if (attempt % 5 === 0) {
+        try { await withTimeout(prismaClient.$disconnect(), 3000, 'disconnect'); } catch (e) {}
+      }
+      const delay = Math.min(2000 * Math.pow(2, Math.max(0, attempt - 1)), DB_PROBE_MAX_DELAY);
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
 };

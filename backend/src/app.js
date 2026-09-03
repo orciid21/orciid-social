@@ -6,6 +6,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 
+const bootStatus = require('./config/bootStatus');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const socialRoutes = require('./routes/social.routes');
@@ -67,9 +68,12 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Serve React frontend static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Health check
+// Health check. `boot` reports whether the background schema-maintenance steps
+// finished, as counts only — enough to confirm a migration landed in production
+// without exposing any schema detail, and without needing shell or file-manager
+// access to the host.
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), boot: bootStatus });
 });
 
 // Routes

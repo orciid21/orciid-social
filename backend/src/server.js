@@ -56,6 +56,7 @@ try {
 
 const { exec } = require('child_process');
 const prismaClient = require('./config/prisma');
+const bootStatus = require('./config/bootStatus');
 const PORT = process.env.PORT || 5000;
 
 let server;
@@ -212,6 +213,7 @@ const readIndexLayout = async (table) => {
 };
 
 const ensureIndexes = async () => {
+  const tally = { created: 0, skipped: 0, failed: 0 };
   for (const { table, name, columns } of PENDING_INDEXES) {
     try {
       const layout = await readIndexLayout(table);
@@ -219,6 +221,7 @@ const ensureIndexes = async () => {
       const covered = layout.some((cols) => columns.every((c, i) => cols[i] === c));
       if (covered) {
         write(`Index ${table}(${columns.join(',')}) already covered — skipping`);
+        tally.skipped += 1;
         continue;
       }
       const ddl =
@@ -226,11 +229,17 @@ const ensureIndexes = async () => {
         columns.map((c) => '`' + c + '`').join(', ') + ')';
       await prismaClient.$executeRawUnsafe(ddl);
       write(`Index ${name} created on ${table}`);
+      tally.created += 1;
     } catch (err) {
       // Never let a migration hiccup stop the server from booting.
       write(`ensureIndexes error for ${table}.${name}: ` + (err.message || err));
+      tally.failed += 1;
     }
   }
+  // Published on /health so the outcome can be confirmed without shell access to
+  // the host — the debug log this used to write to is not reachable over HTTP.
+  bootStatus.indexes = tally;
+  write(`ensureIndexes done: ${JSON.stringify(tally)}`);
 };
 
 const startServer = () => {

@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
 const tiktokService = require('../services/tiktok.service');
 const youtubeService = require('../services/youtube.service');
+const { pickPrimaryMembership } = require('../utils/workspace');
 
 // Helper to get user from token in query string (passed during OAuth redirect)
 const getUserFromToken = async (token) => {
@@ -20,10 +21,7 @@ const getUserFromToken = async (token) => {
 // otherwise a teammate invited to help would sign in to an empty dashboard,
 // because every channel query is scoped to its owner.
 const workspaceIdFor = async (userId) => {
-  const m = await prisma.workspaceMember.findFirst({
-    where: { userId },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
-  });
+  const m = await pickPrimaryMembership(userId);
   return m?.workspaceId || null;
 };
 
@@ -76,7 +74,7 @@ const callbackUrl = (platform, envVar) =>
 // NOTE: Requires passport-facebook. Configure in production with real credentials.
 router.get('/facebook', (req, res) => {
   // Store token in session or state param for callback
-  const { token } = req.query;
+  const { token, force } = req.query;
   const state = Buffer.from(JSON.stringify({ token })).toString('base64');
   const redirect = callbackUrl('facebook', 'FACEBOOK_CALLBACK_URL');
   // This is a "Business"-type Facebook app, so it uses **Facebook Login for
@@ -91,7 +89,17 @@ router.get('/facebook', (req, res) => {
   // /me/accounts returns the chosen Page(s) with their Page tokens.
   // Overridable via FACEBOOK_CONFIG_ID env var if the configuration is recreated.
   const configId = process.env.FACEBOOK_CONFIG_ID || '2746900285685810';
-  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&config_id=${configId}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&response_type=code`;
+  // "Add another account" → re-show the Page picker.
+  //
+  // Facebook was the ONE platform that accepted ?force=1 from getConnectUrl and
+  // then ignored it (Instagram/Threads use force_reauth, TikTok disable_auto_auth,
+  // YouTube prompt=select_account). Without it the dialog silently reuses the
+  // grant already on file, so connecting again returned the SAME Pages and there
+  // was no way to add a Page that was not ticked the first time.
+  // auth_type=rerequest is the documented way to make the dialog prompt again
+  // instead of replaying the stored answer.
+  const reauth = force ? '&auth_type=rerequest' : '';
+  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&config_id=${configId}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&response_type=code${reauth}`;
   res.redirect(fbUrl);
 });
 

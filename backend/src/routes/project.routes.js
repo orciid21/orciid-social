@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../config/prisma');
 const { authenticate } = require('../middleware/auth.middleware');
+const { pickPrimaryMembership } = require('../utils/workspace');
 
 const router = express.Router();
 router.use(authenticate);
@@ -8,10 +9,7 @@ router.use(authenticate);
 // Projects live in a workspace. Every member of the workspace sees them, so the
 // team is invited once rather than per client.
 const getMyWorkspaceId = async (userId) => {
-  const m = await prisma.workspaceMember.findFirst({
-    where: { userId },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
-  });
+  const m = await pickPrimaryMembership(userId);
   return m?.workspaceId || null;
 };
 

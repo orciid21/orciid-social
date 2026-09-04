@@ -1,13 +1,11 @@
 const prisma = require('../config/prisma');
+const { pickPrimaryMembership } = require('../utils/workspace');
 
 
 // Mirrors the post controller: a user's primary workspace, used to scope the
 // approval queue to the whole team rather than just their own drafts.
 const getMyWorkspace = async (userId) => {
-  const m = await prisma.workspaceMember.findFirst({
-    where: { userId },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
-  });
+  const m = await pickPrimaryMembership(userId);
   return { workspaceId: m?.workspaceId || null };
 };
 

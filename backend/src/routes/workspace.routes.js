@@ -3,6 +3,7 @@ const { authenticate } = require('../middleware/auth.middleware');
 const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
 const emailService = require('../services/email.service');
+const { pickPrimaryMembership, normaliseEmail } = require('../utils/workspace');
 
 router.use(authenticate);
 
@@ -12,11 +13,7 @@ router.use(authenticate);
 // register time (OWNER), but older accounts or edge cases may lack one, so
 // get-or-create defensively.
 const getPrimaryWorkspace = async (userId, userName) => {
-  const membership = await prisma.workspaceMember.findFirst({
-    where: { userId },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }], // OWNER sorts before others
-    include: { workspace: true },
-  });
+  const membership = await pickPrimaryMembership(userId);
   if (membership) return { workspace: membership.workspace, role: membership.role };
 
   const slug = `${(userName || 'team').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
@@ -96,7 +93,21 @@ router.post('/team/invite', async (req, res, next) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError('Enter a valid email address', 400);
 
     // Already a registered user? Add them straight to the workspace.
-    const existing = await prisma.user.findUnique({ where: { email } });
+    //
+    // This must match on the NORMALISED address, not the raw one. Gmail ignores
+    // dots, so inviting omar.awdia@gmail.com found no user for the account
+    // registered as omarawdia@gmail.com — the invite then fell through to the
+    // "not registered yet" branch and parked a PENDING row that could never
+    // convert, because conversion only happens at sign-up and that person had
+    // already signed up. The invite looked sent and simply never arrived.
+    const target = normaliseEmail(email);
+    const domain = email.split('@')[1] || '';
+    const candidates = await prisma.user.findMany({
+      where: { email: { endsWith: `@${domain}` } },
+      select: { id: true, email: true },
+      take: 500,
+    });
+    const existing = candidates.find((u) => normaliseEmail(u.email) === target) || null;
     if (existing) {
       const already = await prisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId: existing.id, workspaceId: workspace.id } },

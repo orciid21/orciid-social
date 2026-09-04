@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
 const schedulerService = require('../services/scheduler.service');
+const { pickPrimaryMembership } = require('../utils/workspace');
 
 // Fields of SocialAccount that are safe to send to the browser. Never include
 // accessToken/refreshToken — Page tokens must stay server-side only.
@@ -19,10 +20,7 @@ const SAFE_SOCIAL_ACCOUNT_SELECT = {
 // enum order OWNER<ADMIN<MEMBER), so an owner of any workspace is treated as the
 // owner. Used for the approval flow + team-scoped post visibility.
 const getMyWorkspace = async (userId) => {
-  const m = await prisma.workspaceMember.findFirst({
-    where: { userId },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
-  });
+  const m = await pickPrimaryMembership(userId);
   return { workspaceId: m?.workspaceId || null, role: m?.role || 'OWNER' };
 };
 

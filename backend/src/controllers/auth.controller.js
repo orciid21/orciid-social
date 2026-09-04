@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
 const emailService = require('../services/email.service');
+const { normaliseEmail } = require('../utils/workspace');
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET, {
@@ -59,21 +60,13 @@ const register = async (req, res, next) => {
       // Gmail ignores dots, so an invite to omar.awdia@gmail.com and a sign-up as
       // omarawdia@gmail.com are the same person. Compare a normalised form on
       // BOTH sides — stripping dots from only one still misses the pairing.
-      const normalise = (addr) => {
-        const [local, domain] = String(addr).toLowerCase().split('@');
-        if (!domain) return String(addr).toLowerCase();
-        const bare = ['gmail.com', 'googlemail.com'].includes(domain)
-          ? local.replace(/\./g, '')
-          : local;
-        return `${bare}@${domain}`;
-      };
-      const target = normalise(email);
+      const target = normaliseEmail(email);
       const domain = String(email).toLowerCase().split('@')[1] || '';
       const candidates = await prisma.invitation.findMany({
         where: { status: 'PENDING', email: { endsWith: `@${domain}` } },
         take: 200,
       });
-      const invites = candidates.filter((inv) => normalise(inv.email) === target);
+      const invites = candidates.filter((inv) => normaliseEmail(inv.email) === target);
       for (const inv of invites) {
         await prisma.workspaceMember.upsert({
           where: { userId_workspaceId: { userId: user.id, workspaceId: inv.workspaceId } },

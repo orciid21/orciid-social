@@ -2,16 +2,14 @@ const axios = require('axios');
 const prisma = require('../config/prisma');
 const { AppError } = require('../middleware/error.middleware');
 const { FB_GRAPH, fbPagePicture, fetchManageablePages } = require('../services/facebook.service');
+const { pickPrimaryMembership } = require('../utils/workspace');
 
 // Channels are visible to the whole workspace, not just whoever connected them.
 // Scoping them to their owner is what left an invited teammate staring at an
 // empty dashboard: they were a member of the workspace, but every channel
 // belonged to someone else.
 const channelScope = async (userId) => {
-  const m = await prisma.workspaceMember.findFirst({
-    where: { userId },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
-  });
+  const m = await pickPrimaryMembership(userId);
   return m?.workspaceId
     ? { isActive: true, OR: [{ userId }, { workspaceId: m.workspaceId }] }
     : { isActive: true, userId };

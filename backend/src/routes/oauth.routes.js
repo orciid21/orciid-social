@@ -282,7 +282,12 @@ router.get('/linkedin/callback', async (req, res) => {
 // the consent screen — no Facebook Page linkage required. Needs the app's
 // "Instagram > API setup with Instagram login" product: its own app id/secret
 // and the redirect URL registered there. Tokens live on graph.instagram.com.
-const IG_LOGIN_APP_ID = process.env.INSTAGRAM_APP_ID || '1402647338362389'; // ORCiiD Chat-IG
+// NO FALLBACK. This used to default to '1402647338362389', which is a DIFFERENT
+// Meta app ("ORCiiD Chat-IG"). With INSTAGRAM_APP_ID unset the connect flow would
+// silently authenticate against the wrong app: the user sees a normal Instagram
+// consent screen, approves it, and the token comes back useless for publishing —
+// a failure with no error message anywhere. Missing configuration must be loud.
+const IG_LOGIN_APP_ID = process.env.INSTAGRAM_APP_ID;
 const IG_GRAPH = 'https://graph.instagram.com';
 
 router.get('/instagram', (req, res) => {

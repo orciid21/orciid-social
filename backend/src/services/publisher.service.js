@@ -87,6 +87,13 @@ const publishers = {
     const url = post.mediaUrls[0];
     const isVideo = /\.(mp4|mov|m4v|webm|avi)(\?.*)?$/i.test(url);
 
+    // Instagram accepts JPEG and nothing else for image posts. A PNG is rejected
+    // by the container step with a message that does not mention the format, so
+    // failing here with a readable reason saves a long hunt.
+    if (!isVideo && !/\.(jpe?g)(\?.*)?$/i.test(url)) {
+      throw new Error('Instagram only accepts JPEG images. Convert this image to .jpg and try again.');
+    }
+
     // Create the media container (REELS is the supported feed video type).
     const containerRes = await axios.post(
       `${IG_GRAPH}/${account.platformId}/media`,

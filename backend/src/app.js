@@ -136,6 +136,7 @@ app.get('/health/db', async (req, res) => {
 });
 
 // Routes
+app.use('/api/meta', require('./routes/meta.routes'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/social', socialRoutes);

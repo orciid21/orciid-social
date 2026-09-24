@@ -4,6 +4,7 @@ const prisma = require('../config/prisma');
 const tiktokService = require('../services/tiktok.service');
 const youtubeService = require('../services/youtube.service');
 const { pickPrimaryMembership } = require('../utils/workspace');
+const { FB_GRAPH, FB_DIALOG } = require('../services/facebook.service');
 
 // Helper to get user from token in query string (passed during OAuth redirect)
 const getUserFromToken = async (token) => {
@@ -99,7 +100,7 @@ router.get('/facebook', (req, res) => {
   // auth_type=rerequest is the documented way to make the dialog prompt again
   // instead of replaying the stored answer.
   const reauth = force ? '&auth_type=rerequest' : '';
-  const fbUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&config_id=${configId}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&response_type=code${reauth}`;
+  const fbUrl = `${FB_DIALOG}?client_id=${process.env.FACEBOOK_APP_ID}&config_id=${configId}&redirect_uri=${encodeURIComponent(redirect)}&state=${state}&response_type=code${reauth}`;
   res.redirect(fbUrl);
 });
 
@@ -112,7 +113,7 @@ router.get('/facebook/callback', async (req, res) => {
 
     // Exchange code for access token
     const axios = require('axios').default;
-    const tokenRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+    const tokenRes = await axios.get(`${FB_GRAPH}/oauth/access_token`, {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
@@ -128,7 +129,7 @@ router.get('/facebook/callback', async (req, res) => {
     // what we want for publishing to the user's Pages.
     let longLivedToken = access_token;
     try {
-      const llRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+      const llRes = await axios.get(`${FB_GRAPH}/oauth/access_token`, {
         params: {
           grant_type: 'fb_exchange_token',
           client_id: process.env.FACEBOOK_APP_ID,

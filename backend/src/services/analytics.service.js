@@ -14,8 +14,7 @@ const prisma = require('../config/prisma');
  * had on this date", so a series can be drawn and growth can be seen.
  */
 
-const FB_GRAPH = 'https://graph.facebook.com/v18.0';
-const IG_GRAPH = 'https://graph.instagram.com/v21.0';
+const { FB_GRAPH, IG_GRAPH } = require('./facebook.service');
 
 const zero = { likes: 0, comments: 0, shares: 0, reach: 0, clicks: 0, impressions: 0 };
 

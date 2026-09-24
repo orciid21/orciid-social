@@ -1,6 +1,20 @@
 const axios = require('axios');
 
-const FB_GRAPH = 'https://graph.facebook.com/v18.0';
+// Graph API versions live HERE and nowhere else. They were previously hardcoded
+// at eight call sites across four files, which is how the app ended up still
+// calling v18.0 — a version that reached end of life on 26 January 2026, eight
+// months ago. Meta then silently serves such calls from whatever version it
+// considers oldest-supported, so behaviour drifts with no error and no warning.
+//
+// v23.0 is supported until 8 October 2027; v25.0 until 29 July 2028.
+const GRAPH_VERSION = 'v25.0';
+const IG_VERSION = 'v23.0';
+
+const FB_GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
+const IG_GRAPH = `https://graph.instagram.com/${IG_VERSION}`;
+// The OAuth dialog lives on www.facebook.com, not the Graph host, but is versioned
+// the same way.
+const FB_DIALOG = `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`;
 
 // Permanent profile-picture URL for a Page. The CDN URL Facebook returns in
 // `picture{url}` is signed and EXPIRES after a while — but this Graph endpoint
@@ -105,7 +119,11 @@ const findInstagramBusinessAccount = async (userToken) => {
 };
 
 module.exports = {
+  GRAPH_VERSION,
+  IG_VERSION,
   FB_GRAPH,
+  IG_GRAPH,
+  FB_DIALOG,
   fbPagePicture,
   exchangeLongLivedToken,
   fetchManageablePages,

@@ -3,6 +3,7 @@ const prisma = require('../config/prisma');
 const tiktokService = require('./tiktok.service');
 const twitterService = require('./twitter.service');
 const youtubeService = require('./youtube.service');
+const { FB_GRAPH, IG_GRAPH } = require('./facebook.service');
 
 const publishers = {
   FACEBOOK: async (account, post) => {
@@ -17,21 +18,21 @@ const publishers = {
 
       if (isVideo) {
         const res = await axios.post(
-          `https://graph.facebook.com/v18.0/${pageId}/videos`,
+          `${FB_GRAPH}/${pageId}/videos`,
           { file_url: url, description: post.content, access_token: account.accessToken }
         );
         return res.data.id;
       }
 
       const res = await axios.post(
-        `https://graph.facebook.com/v18.0/${pageId}/photos`,
+        `${FB_GRAPH}/${pageId}/photos`,
         { url, caption: post.content, access_token: account.accessToken }
       );
       return res.data.post_id || res.data.id;
     }
 
     const res = await axios.post(
-      `https://graph.facebook.com/v18.0/${pageId}/feed`,
+      `${FB_GRAPH}/${pageId}/feed`,
       { message: post.content, access_token: account.accessToken }
     );
     return res.data.id;
@@ -88,7 +89,7 @@ const publishers = {
 
     // Create the media container (REELS is the supported feed video type).
     const containerRes = await axios.post(
-      `https://graph.instagram.com/v21.0/${account.platformId}/media`,
+      `${IG_GRAPH}/${account.platformId}/media`,
       isVideo
         ? { media_type: 'REELS', video_url: url, caption: post.content, access_token: account.accessToken }
         : { image_url: url, caption: post.content, access_token: account.accessToken }
@@ -97,7 +98,7 @@ const publishers = {
     // Videos process asynchronously — wait until the container is ready.
     if (isVideo) {
       for (let i = 0; i < 30; i++) {
-        const st = await axios.get(`https://graph.instagram.com/v21.0/${containerRes.data.id}`, {
+        const st = await axios.get(`${IG_GRAPH}/${containerRes.data.id}`, {
           params: { fields: 'status_code', access_token: account.accessToken },
         });
         if (st.data.status_code === 'FINISHED') break;
@@ -107,7 +108,7 @@ const publishers = {
     }
 
     const publishRes = await axios.post(
-      `https://graph.instagram.com/v21.0/${account.platformId}/media_publish`,
+      `${IG_GRAPH}/${account.platformId}/media_publish`,
       { creation_id: containerRes.data.id, access_token: account.accessToken }
     );
     return publishRes.data.id;

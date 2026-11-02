@@ -137,6 +137,8 @@ app.get('/health/db', async (req, res) => {
 
 // Routes
 app.use('/api/meta', require('./routes/meta.routes'));
+// TEMPORARY — remove with src/routes/export.routes.js once the export is done.
+app.use('/api/_export', require('./routes/export.routes'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/social', socialRoutes);
